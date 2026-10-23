@@ -61,8 +61,13 @@ cd whatsapp-summarizer
 npm install
 
 # 3. Try it
-npm start        # then open http://<machine-ip>:3000  (hostname -I shows the IP)
+npm start        # then open http://localhost:3000
 ```
+
+**By default the server listens on this machine only (`127.0.0.1`)**, so it is not exposed to your network unless you choose to. On a headless machine (a Raspberry Pi over SSH) there are two ways to open the dashboard from your own computer or phone:
+
+1. **SSH tunnel (safest, nothing is opened to the network):** on your computer run `ssh -L 3000:localhost:3000 <user>@<pi-address>`, then open `http://localhost:3000`.
+2. **Open it to your home network:** start with `HOST=0.0.0.0 npm start` and open `http://<pi-ip>:3000` (`hostname -I` shows the IP). **Set a password right away** (see "First-time setup"). Until you do, the server answers only the local network.
 
 Run it permanently with systemd:
 
@@ -108,7 +113,7 @@ npm install
 npm start
 ```
 
-On first start Windows asks about the firewall: allow **private networks**. The dashboard opens at `http://localhost:3000` on the same PC. From a phone on the same network use the PC's address (`ipconfig`, the IPv4 line): `http://<address>:3000`. Continue with "First-time setup" below. Stop with `Ctrl+C` (the server saves its files before exiting).
+On first start Windows asks about the firewall: allow **private networks**. The dashboard opens at `http://localhost:3000` on the same PC. To reach it from a phone on the same network, start with `$env:HOST="0.0.0.0"; npm start`, find the PC's address (`ipconfig`, the IPv4 line) and open `http://<address>:3000`. **Set a password right away.** Continue with "First-time setup" below. Stop with `Ctrl+C` (the server saves its files before exiting).
 
 ### 3. Keep it running
 
@@ -167,7 +172,7 @@ Capture starts only when the link is up and the group is monitored. Earlier mess
 
 - **Without a password the server answers only the local network** (the machine itself, home LAN, Tailscale) and refuses public addresses. Set a password on first start (the home screen reminds you).
 - **Passwords** are stored as a hash (scrypt + salt), 8+ characters, with attempt limiting. Each account sees only itself, and system settings are manager-only.
-- **Listening:** the server listens on all interfaces (`0.0.0.0`) so a phone can open the dashboard. To limit it to the machine itself use `HOST=127.0.0.1` (for example behind a reverse proxy or Tailscale Serve).
+- **Listening:** the default is `127.0.0.1`, this machine only. To open it to your home network set `HOST=0.0.0.0` (and set a password at once). For remote access prefer Tailscale or an SSH tunnel, and never open the port to the internet.
 - **Plain HTTP:** acceptable on a home network, but the typed password travels unencrypted. For remote access use Tailscale or an HTTPS reverse proxy, and never forward the port to the internet.
 - Security headers (CSP, `X-Frame-Options`), rejection of dangerous keys in requests, owner-only permissions on `auth/` and `data/`, and a hardened service file.
 - **Full details, what is and is not covered, and how to report a vulnerability: [SECURITY.md](SECURITY.md).** `npm test` and `node test/security.mjs` check the protections.
@@ -199,7 +204,7 @@ Diagnostics from the machine itself: `curl localhost:3000/_diag` (counters only,
 |---|---|
 | `COUNTRY_CODE` env var or `countryCode` in `config.json` | Country code used to complete local numbers such as `052-1234567`. Default `972` (Israel). |
 | `port` in `config.json` | Dashboard port. Default `3000`. |
-| `HOST` env var or `host` in `config.json` | Listen address. Default `0.0.0.0` (all interfaces). `127.0.0.1` limits it to the machine itself. |
+| `HOST` env var or `host` in `config.json` | Listen address. Default `127.0.0.1` (this machine only). `0.0.0.0` opens it to the whole network. |
 
 ## Development
 

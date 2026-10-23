@@ -9,6 +9,9 @@ Type=simple
 User=pi
 WorkingDirectory=/home/pi/whatsapp-summarizer
 ExecStart=/usr/bin/env node --experimental-global-webcrypto server.js
+# The dashboard listens on this machine only. To reach it from other devices on your network, uncomment the next
+# line AND set a dashboard password straight away (README, Security).
+#Environment=HOST=0.0.0.0
 Restart=always
 RestartSec=10
 # Give the server time to save its files before it is stopped (see README, "Restarts")

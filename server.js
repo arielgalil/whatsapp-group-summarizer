@@ -727,7 +727,7 @@ async function personalizeReply(template, senderName, incoming) {
 
 נוסח קבוע: ${template}
 שם השולח: ${senderName || 'לא ידוע'}
-ההודעה שלו: ${String(incoming || '').slice(0, 500)}`;
+ההודעה שלו: ${redactSensitive(String(incoming || '').slice(0, 500))}`;
   for (const model of [config.geminiModel, 'gemini-flash-lite-latest', 'gemini-3.5-flash'].filter((m, i, a) => m && a.indexOf(m) === i)) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -836,6 +836,29 @@ function addHistory(entry) {
   if (entry.status === 'failed') notify(`fail:${entry.accountId}:${entry.collectionId || entry.label}`, `⚠️ ${config.accounts[entry.accountId]?.name || entry.accountId}: הסיכום "${String(entry.label || '').replace(/^אוסף: /, '')}" לא נשלח: ${String(entry.error || 'שגיאה').slice(0, 120)}`, { repeatHours: 3 });
 }
 
+// Data minimisation: obvious secrets in message text (card numbers, ID numbers, IBANs, e-mail addresses,
+// "password: ..." lines) are masked before the text leaves for Gemini. On by default; config.redactSensitive = false disables.
+function luhnOk(d) {
+  let sum = 0, alt = false;
+  for (let i = d.length - 1; i >= 0; i--) { let n = +d[i]; if (alt) { n *= 2; if (n > 9) n -= 9; } sum += n; alt = !alt; }
+  return sum % 10 === 0;
+}
+function israeliIdOk(d) {
+  if (d.length !== 9) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) { let n = +d[i] * (i % 2 ? 2 : 1); if (n > 9) n -= 9; sum += n; }
+  return sum % 10 === 0;
+}
+function redactSensitive(text) {
+  if (typeof config !== 'undefined' && config.redactSensitive === false) return String(text);
+  return String(text)
+    .replace(/\w[\w.+-]*@[\w-]+(?:\.[\w-]+)+/g, '[אימייל]')
+    .replace(/(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)/g, m => { const d = m.replace(/\D/g, ''); return d.length >= 13 && d.length <= 19 && luhnOk(d) ? '[כרטיס אשראי]' : m; })
+    .replace(/\bIL\d{2}(?:[ ]?\d{4}){4}[ ]?\d{3}\b/gi, '[חשבון בנק]')
+    .replace(/(?<!\d)\d{9}(?!\d)/g, m => israeliIdOk(m) ? '[ת.ז.]' : m)
+    .replace(/(סיסמה|סיסמא|password|passcode|pin|קוד אימות|קוד חד פעמי|otp)[^\n:=]{0,30}[:=]\s*\S+/gi, '$1: [הוסתר]');
+}
+
 // Gemini Summarizer Function
 // windowMode: '24h' (manual runs: the last 24 hours) or 'yesterday' (scheduled runs: the previous calendar day, 00:00-24:00)
 // meta: extra fields for the history entry, e.g. { collectionId } so renaming a collection keeps its history
@@ -884,7 +907,7 @@ async function summarizeAccount(accountId, targetJids = null, scheduleLabel = ''
         const when = new Date(msg.timestamp * 1000);
         const hm = when.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
         const stamp = windowMode === 'yesterday' ? hm : `${when.getDate()}.${when.getMonth() + 1} ${hm}`;
-        messagesByGroup[msg.groupName].push({ t: msg.timestamp, s: `[${stamp}] ${msg.sender}: ${msg.text}` });
+        messagesByGroup[msg.groupName].push({ t: msg.timestamp, s: `[${stamp}] ${msg.sender}: ${redactSensitive(msg.text)}` });
       }
     } catch (e) {}
   }
@@ -1146,6 +1169,7 @@ app.use((req, res, next) => {
   }
   next();
 });
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 app.use(express.json({ limit: '100kb' }));
 // Keys that would reach Object.prototype if a request value were used as a property name
 const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -1229,7 +1253,7 @@ const loginFails = {};
 // Diagnostics for the person at the Pi itself (SSH): loopback only, no data beyond counters
 app.get('/_diag', (req, res) => {
   const ip = req.socket.remoteAddress || '';
-  if (!(ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1')) return res.status(403).end();
+  if (!(ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') || req.headers['x-forwarded-for']) return res.status(403).end();
   const out = { uptimeMin: Math.round(process.uptime() / 60), lagMs: loopLag.worst, accounts: {} };
   for (const [id, sess] of Object.entries(sessions)) out.accounts[id] = { status: sess.status, stats: sess.stats, lastEventAgoSec: sess.lastEvent ? Math.round((Date.now() - sess.lastEvent) / 1000) : null, connectedAgoSec: sess.connectedAt ? Math.round((Date.now() - sess.connectedAt) / 1000) : null, drops30: (sess.drops || []).filter(t => Date.now() - t < 1800000).length };
   res.json(out);
@@ -1450,7 +1474,7 @@ app.post('/api/gemini/test', async (req, res) => {
     if (!r.ok) {
       const t = await r.text();
       const msg = r.status === 503 || r.status === 429 ? 'המודל עמוס כרגע' : r.status === 404 ? 'המודל לא קיים או לא זמין למפתח' : `שגיאה ${r.status}`;
-      return res.json({ ok: false, ms, error: msg, detail: t.slice(0, 200) });
+      return res.json({ ok: false, ms, error: msg });
     }
     res.json({ ok: true, ms, model });
   } catch (e) {
@@ -1661,7 +1685,8 @@ app.post('/api/accounts/:id/summarize', async (req, res) => {
     const summary = await runExclusive({ accountId: id, label: lbl }, () => summarizeAccount(id, targetJids, lbl, '24h', collectionId ? { collectionId } : {}));
     res.json({ ok: true, summary });
   } catch (err) {
-    res.status(err.busy ? 409 : 500).json({ ok: false, busy: Boolean(err.busy), error: err.message });
+    if (!err.busy) console.error(`[summarize] ${err.message}`);
+    res.status(err.busy ? 409 : 500).json({ ok: false, busy: Boolean(err.busy), error: err.busy ? err.message : (/^Gemini API error|No summary text/.test(err.message) ? 'שירות ה-AI לא זמין או עמוס כרגע. נסו שוב בעוד רגע.' : 'הסיכום נכשל. הפרטים ביומן השרת.') });
   }
 });
 
@@ -1843,15 +1868,15 @@ app.post('/api/config/alerts/test', async (req, res) => {
   try {
     const r = await fetch(`https://ntfy.sh/${encodeURIComponent(config.alerts.ntfyTopic)}`, { method: 'POST', headers: { Title: 'WhatsApp Summarizer' }, body: '✅ בדיקת התראה: ההתראות מהשרת מגיעות.', signal: AbortSignal.timeout(10000) });
     res.json({ ok: r.ok });
-  } catch (e) { res.status(502).json({ error: 'השליחה נכשלה: ' + e.message }); }
+  } catch (e) { res.status(502).json({ error: 'השליחה נכשלה. בדקו שהשרת מחובר לאינטרנט.' }); }
 });
 
 // Start Web Server FIRST so it responds immediately!
 const PORT = config.port || 3000;
-const HOST = process.env.HOST || config.host || '0.0.0.0';
+const HOST = process.env.HOST || config.host || '127.0.0.1';
 app.listen(PORT, HOST, () => {
   console.log(`=======================================================`);
-  console.log(`WhatsApp Summarizer Web UI: http://${HOST}:${PORT}${HOST === '0.0.0.0' ? ' (all network interfaces; set HOST=127.0.0.1 to limit to this machine)' : ''}`);
+  console.log(`WhatsApp Summarizer Web UI: http://${HOST}:${PORT}${HOST === '0.0.0.0' ? ' (all network interfaces; set HOST=127.0.0.1 to limit to this machine)' : HOST === '127.0.0.1' ? ' (this machine only; set HOST=0.0.0.0 to reach it from other devices on your network)' : ''}`);
   console.log(`Open in a browser on this network: http://<this-machine-ip>:${PORT}`);
   console.log(`=======================================================`);
 

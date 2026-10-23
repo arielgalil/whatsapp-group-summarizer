@@ -13,7 +13,7 @@ Found a vulnerability? **Please do not open a public issue.** Use "Report a vuln
 
 | | |
 |---|---|
-| **כתובת האזנה / Listen address** | ברירת המחדל `0.0.0.0` (כל הממשקים), כדי שאפשר לפתוח את הדשבורד מהטלפון. `HOST=127.0.0.1` מגביל למחשב עצמו (לשימוש מאחורי reverse proxy או Tailscale Serve). Default `0.0.0.0` so a phone can open it; `HOST=127.0.0.1` restricts it to the machine itself. |
+| **כתובת האזנה / Listen address** | ברירת המחדל `127.0.0.1` (המחשב עצמו בלבד). `HOST=0.0.0.0` פותח לרשת, ומומלץ אז להגדיר סיסמה מיד; לגישה מרחוק עדיף Tailscale או מנהרת SSH. Default `127.0.0.1` (this machine only); `HOST=0.0.0.0` opens it to the network, so set a password at once; for remote access prefer Tailscale or an SSH tunnel. |
 | **ללא סיסמה / No password** | כל עוד לא הוגדרה סיסמה, השרת עונה **רק** לרשת המקומית (`127.0.0.1`, `10/8`, `172.16/12`, `192.168/16`, Tailscale `100.64/10`, `fc00::/7`, `fe80::/10`) ומחזיר 403 לכתובות ציבוריות. Until a password exists the server answers **only** local/private addresses and returns 403 to public ones. |
 | **סיסמאות / Passwords** | scrypt עם salt אקראי, 8 תווים לפחות, השוואה בזמן קבוע. ניסיונות כניסה מוגבלים (5 ל-10 דקות לכתובת). scrypt + random salt, 8+ characters, constant-time compare, 5 attempts per 10 minutes per address. |
 | **סשנים / Sessions** | מפתח אקראי של 256 ביט בעוגיית `HttpOnly; SameSite=Strict` (ו-`Secure` מאחורי HTTPS). בשרת נשמר רק גיבוב SHA-256. 256-bit random token; only its SHA-256 is stored. |

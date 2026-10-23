@@ -1206,7 +1206,7 @@
         `<button class="btn" data-act="closeSheet">ביטול</button><button class="btn primary" data-act="saveKey">שמירה</button>`);
     },
     async editAlerts() {
-      const rnd = 'wa-' + Array.from(crypto.getRandomValues(new Uint8Array(8)), b => (b % 36).toString(36)).join('');
+      const rnd = 'wa-' + Array.from(crypto.getRandomValues(new Uint8Array(16)), b => (b % 36).toString(36)).join('');
       const cur_ = state.alertTopic || rnd;
       openSheet('התראות לטלפון', `<p class="hint">ההתראה מגיעה לאפליקציית <b>ntfy</b> (חינמית, בלי חשבון). היא נשלחת כשהחיבור לוואטסאפ נופל, כשהקליטה נתקעת, או כשסיכום נכשל. ההודעה כוללת רק מה התקלקל, בלי תוכן מוואטסאפ.</p>
         <ol class="hint" style="margin:10px 18px;line-height:1.8"><li>מתקינים את ntfy בטלפון.</li><li>מוסיפים מנוי (Subscribe) לנושא שמופיע למטה.</li><li>שומרים כאן ולוחצים "שליחת בדיקה".</li></ol>

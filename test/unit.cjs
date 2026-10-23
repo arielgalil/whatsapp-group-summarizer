@@ -19,6 +19,21 @@ t('outside window', () => assert.ok(!autoReplyActive({ start: '22:00', end: '07:
 t('disabled rule', () => assert.ok(!autoReplyActive({ start: '00:00', end: '00:00', enabled: false }, at(19, 12, 0))));
 t('same start/end = all day', () => assert.ok(autoReplyActive({ start: '08:00', end: '08:00' }, at(19, 3, 0))));
 
+// data minimisation before text goes to Gemini
+for (const fn of ['luhnOk', 'israeliIdOk', 'redactSensitive']) eval(grab(fn).replace('function ' + fn, 'global.' + fn + ' = function'));
+t('redact: valid card number', () => assert.strictEqual(redactSensitive('הכרטיס 4111 1111 1111 1111 תודה'), 'הכרטיס [כרטיס אשראי] תודה'));
+t('redact: card number with dashes', () => assert.ok(redactSensitive('5555-5555-5555-4444').includes('[כרטיס אשראי]')));
+t('redact: number failing Luhn is left alone', () => assert.strictEqual(redactSensitive('מספר 4111 1111 1111 1112'), 'מספר 4111 1111 1111 1112'));
+t('redact: valid Israeli ID', () => assert.strictEqual(redactSensitive('ת"ז 123456782'), 'ת"ז [ת.ז.]'));
+t('redact: invalid 9 digits left alone', () => assert.strictEqual(redactSensitive('קוד 123456789'), 'קוד 123456789'));
+t('redact: e-mail', () => assert.strictEqual(redactSensitive('כתבו ל-dana.levi@example.co.il'), 'כתבו ל-[אימייל]'));
+t('redact: IBAN', () => assert.ok(redactSensitive('IL62 0108 0000 0009 9999 999').includes('[חשבון בנק]')));
+t('redact: password line', () => assert.strictEqual(redactSensitive('הסיסמה לוויי-פיי: abc12345').includes('abc12345'), false));
+t('redact: normal text and a phone number untouched', () => assert.strictEqual(redactSensitive('מחר אסיפה ב-18:30, חייגו 050-1234567'), 'מחר אסיפה ב-18:30, חייגו 050-1234567'));
+global.config = { redactSensitive: false };
+t('redact: can be switched off', () => assert.strictEqual(redactSensitive('a@b.co'), 'a@b.co'));
+delete global.config;
+
 // network gate: which clients are served while no password exists
 eval(src.match(/const isPrivateIp = ip => \{[\s\S]*?\n\};\n/)[0].replace('const isPrivateIp =', 'global.isPrivateIp ='));
 for (const ip of ['127.0.0.1', '::1', '::ffff:192.168.1.20', '10.1.2.3', '172.16.0.5', '172.31.255.1', '100.64.1.1', '169.254.3.3', 'fd12:3456::1', 'fe80::1']) t(`private: ${ip}`, () => assert.ok(isPrivateIp(ip)));

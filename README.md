@@ -53,7 +53,7 @@ node -v   # אמור להציג v18.20.4
 
 ```bash
 sudo apt install -y git
-git clone https://github.com/<USER>/<REPO>.git whatsapp-summarizer
+git clone https://github.com/arielgalil/whatsapp-group-summarizer.git whatsapp-summarizer
 cd whatsapp-summarizer
 npm install
 ```

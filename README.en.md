@@ -37,7 +37,7 @@ sudo tar -xJf node-v18.20.4-linux-armv6l.tar.xz -C /usr/local --strip-components
 
 # 2. Code and dependencies
 sudo apt install -y git
-git clone https://github.com/<USER>/<REPO>.git whatsapp-summarizer
+git clone https://github.com/arielgalil/whatsapp-group-summarizer.git whatsapp-summarizer
 cd whatsapp-summarizer
 npm install
 

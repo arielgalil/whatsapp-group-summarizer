@@ -14,6 +14,13 @@ RestartSec=10
 # Give the server time to save its files before it is stopped (see README, "Restarts")
 TimeoutStopSec=30
 Nice=15
+# Hardening: no privilege escalation, private /tmp, read-only system folders
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
 StandardOutput=journal
 StandardError=journal
 

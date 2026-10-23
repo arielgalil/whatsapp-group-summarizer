@@ -163,6 +163,15 @@ Capture starts only when the link is up and the group is monitored. Earlier mess
 - **Remote access:** do not expose the dashboard to the internet. Use Tailscale on the server and your phone.
 - **Files:** `config.json` (settings, password hashes), `auth/` (WhatsApp keys, secret), `data/` (messages for 7 days, contacts, history), `backups/` (daily, 7 days). All are in `.gitignore`. Backups are on the same machine, so copy `config.json` and `auth/` somewhere safe now and then.
 
+## Security
+
+- **Without a password the server answers only the local network** (the machine itself, home LAN, Tailscale) and refuses public addresses. Set a password on first start (the home screen reminds you).
+- **Passwords** are stored as a hash (scrypt + salt), 8+ characters, with attempt limiting. Each account sees only itself, and system settings are manager-only.
+- **Listening:** the server listens on all interfaces (`0.0.0.0`) so a phone can open the dashboard. To limit it to the machine itself use `HOST=127.0.0.1` (for example behind a reverse proxy or Tailscale Serve).
+- **Plain HTTP:** acceptable on a home network, but the typed password travels unencrypted. For remote access use Tailscale or an HTTPS reverse proxy, and never forward the port to the internet.
+- Security headers (CSP, `X-Frame-Options`), rejection of dangerous keys in requests, owner-only permissions on `auth/` and `data/`, and a hardened service file.
+- **Full details, what is and is not covered, and how to report a vulnerability: [SECURITY.md](SECURITY.md).** `npm test` and `node test/security.mjs` check the protections.
+
 ## Updating
 
 ```bash
@@ -190,6 +199,7 @@ Diagnostics from the machine itself: `curl localhost:3000/_diag` (counters only,
 |---|---|
 | `COUNTRY_CODE` env var or `countryCode` in `config.json` | Country code used to complete local numbers such as `052-1234567`. Default `972` (Israel). |
 | `port` in `config.json` | Dashboard port. Default `3000`. |
+| `HOST` env var or `host` in `config.json` | Listen address. Default `0.0.0.0` (all interfaces). `127.0.0.1` limits it to the machine itself. |
 
 ## Development
 

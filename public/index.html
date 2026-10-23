@@ -618,6 +618,9 @@
     if (state.health && state.health.lagMs > 10000) {
       alerts.push(`<div class="alert warn"><b>${ICON.alert} השרת עמוס כרגע</b><p>פעולות בדשבורד עלולות להיות איטיות (עיכוב של עד ${Math.round(state.health.lagMs / 1000)} שניות).</p></div>`);
     }
+    if (state.me && state.me.authEnabled === false) {
+      alerts.push(`<div class="alert warn"><b>${ICON.alert} הדשבורד פתוח בלי סיסמה</b><p>כל מי שנמצא ברשת יכול לקרוא את הסיכומים ולשלוח הודעות מהחשבון שלכם. מומלץ להגדיר סיסמה.</p><div class="acts"><button class="btn small primary" data-act="editPassword">הגדרת סיסמה</button></div></div>`);
+    }
     if (!state.hasGeminiKey) {
       alerts.push(`<div class="alert bad"><b>${ICON.alert} חסר מפתח Gemini</b><p>בלעדיו אי אפשר להפיק סיכומים.</p><div class="acts"><button class="btn small primary" data-act="editKey">הגדרת מפתח</button></div></div>`);
     }
@@ -1170,7 +1173,7 @@
       openSheet(has ? `סיסמה: ${a.name}` : `קביעת סיסמה: ${a.name}`, `
         <p class="hint">${intro}</p>
         <p class="hint" style="margin-top:6px">הסיסמה עצמה לא נשמרת: ב-Pi נשמרת רק טביעת אצבע מוצפנת שלה.</p>
-        <label class="lbl2" for="pw1">סיסמה חדשה (6 תווים לפחות)</label>
+        <label class="lbl2" for="pw1">סיסמה חדשה (8 תווים לפחות)</label>
         <input id="pw1" type="password" class="field" autocomplete="new-password">
         <label class="lbl2" for="pw2">שוב, לאימות</label>
         <input id="pw2" type="password" class="field" autocomplete="new-password">
@@ -1179,7 +1182,7 @@
     },
     async savePassword(el) {
       const p1 = $('#pw1').value, p2 = $('#pw2').value;
-      if (p1.length < 6) { $('#pwErr').textContent = 'סיסמה של 6 תווים לפחות'; return; }
+      if (p1.length < 8) { $('#pwErr').textContent = 'סיסמה של 8 תווים לפחות'; return; }
       if (p1 !== p2) { $('#pwErr').textContent = 'שתי הסיסמאות לא זהות'; return; }
       const d = await api('/api/auth/password', 'POST', { accountId: el.dataset.id, password: p1 });
       if (!d.ok) { $('#pwErr').textContent = d.error || 'השמירה נכשלה'; return; }

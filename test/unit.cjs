@@ -19,6 +19,11 @@ t('outside window', () => assert.ok(!autoReplyActive({ start: '22:00', end: '07:
 t('disabled rule', () => assert.ok(!autoReplyActive({ start: '00:00', end: '00:00', enabled: false }, at(19, 12, 0))));
 t('same start/end = all day', () => assert.ok(autoReplyActive({ start: '08:00', end: '08:00' }, at(19, 3, 0))));
 
+// network gate: which clients are served while no password exists
+eval(src.match(/const isPrivateIp = ip => \{[\s\S]*?\n\};\n/)[0].replace('const isPrivateIp =', 'global.isPrivateIp ='));
+for (const ip of ['127.0.0.1', '::1', '::ffff:192.168.1.20', '10.1.2.3', '172.16.0.5', '172.31.255.1', '100.64.1.1', '169.254.3.3', 'fd12:3456::1', 'fe80::1']) t(`private: ${ip}`, () => assert.ok(isPrivateIp(ip)));
+for (const ip of ['8.8.8.8', '172.32.0.1', '172.15.0.1', '100.128.0.1', '11.0.0.1', '2001:4860::1', '', undefined]) t(`public: ${ip}`, () => assert.ok(!isPrivateIp(ip)));
+
 // pruneSignalSessions on a temporary folder
 global.fs = fs; global.path = path;
 global.MAX_CLOSED_SESSIONS = 2;

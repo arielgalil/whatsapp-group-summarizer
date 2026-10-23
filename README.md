@@ -84,6 +84,66 @@ systemctl status whatsapp-summarizer
 
 יומן השרת: `journalctl -u whatsapp-summarizer -f`.
 
+## התקנה ב-Windows
+
+מתאים למחשב שנשאר דלוק (למשל מחשב ישן בבית). זה עובד כמו בלינוקס, עם הבדלים קטנים.
+
+### 1. התקנת Node.js ו-Git
+
+ב-PowerShell (או מהאתרים [nodejs.org](https://nodejs.org) ו-[git-scm.com](https://git-scm.com/download/win)):
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+winget install Git.Git
+```
+
+סוגרים את החלון ופותחים PowerShell חדש, כדי שהפקודות יזוהו. בדיקה: `node -v` אמור להציג גרסה 18 ומעלה.
+
+### 2. הורדה, התקנה והפעלה
+
+```powershell
+git clone https://github.com/arielgalil/whatsapp-group-summarizer.git whatsapp-summarizer
+cd whatsapp-summarizer
+npm install
+npm start
+```
+
+בהפעלה הראשונה Windows שואל על חומת האש: מאשרים **רשתות פרטיות**. הדשבורד נפתח ב-`http://localhost:3000` באותו מחשב. כדי לפתוח אותו מהטלפון באותה רשת, מוצאים את כתובת המחשב עם `ipconfig` (שורת IPv4) ופותחים `http://<כתובת>:3000`.
+
+המשך ההגדרה זהה: ראו "הגדרה ראשונה בדשבורד" למטה. עוצרים עם `Ctrl+C` (השרת שומר את הקבצים לפני שהוא נסגר).
+
+### 3. שיהיה פועל תמיד
+
+**אפשרות פשוטה, בלי התקנות נוספות:** יוצרים קיצור דרך לקובץ `deploy\windows-start.bat`, ושמים אותו בתיקיית ההפעלה (`Win+R`, ואז `shell:startup`). השרת יעלה בכל כניסה של המשתמש, ויופעל מחדש אם יקרוס. מתאים כשהמשתמש נשאר מחובר למחשב.
+
+**אפשרות מומלצת, כשירות שרץ גם בלי כניסה:** בעזרת [NSSM](https://nssm.cc). ב-PowerShell **כמנהל** (בתיקיית הפרויקט):
+
+```powershell
+winget install NSSM.NSSM
+$dir = (Get-Location).Path
+$node = (Get-Command node).Source
+nssm install WhatsAppSummarizer $node "--experimental-global-webcrypto server.js"
+nssm set WhatsAppSummarizer AppDirectory $dir
+nssm set WhatsAppSummarizer AppStopMethodConsole 20000      # שולח Ctrl+C ומחכה עד 20 שניות לשמירה
+nssm set WhatsAppSummarizer AppExit Default Restart
+nssm set WhatsAppSummarizer AppStdout "$dir\server.log"
+nssm set WhatsAppSummarizer AppStderr "$dir\server.log"
+nssm set WhatsAppSummarizer AppRotateFiles 1
+nssm start WhatsAppSummarizer
+```
+
+עצירה והפעלה: `nssm stop WhatsAppSummarizer` ו-`nssm start WhatsAppSummarizer`. היומן בקובץ `server.log` בתיקייה.
+
+### 4. דברים ש-Windows דורש
+
+- **מצב שינה:** הגדרות ← מערכת ← צריכת חשמל ← "שינה": **אף פעם** (כשהמחשב מחובר לחשמל). מחשב שנרדם מפסיק לקלוט הודעות.
+- **עדכוני Windows** מפעילים מחדש את המחשב. השירות (או קיצור ההפעלה) יעלה שוב לבד, אבל הודעות שהגיעו בזמן הכיבוי לא יימצאו.
+- **אל תכבו בכוח** (הרג התהליך ב-Task Manager) בזמן קליטה: עצירה רגילה (`Ctrl+C`, או `nssm stop`) שומרת את הקבצים, והרג פתאומי עלול להשאיר מפתחות הצפנה בחצי מצב.
+- **אבחון:** `curl.exe http://localhost:3000/_diag` מציג מונים, בלי תוכן.
+- **עדכון:** עוצרים את השירות, ואז `git pull`, `npm install`, ומפעילים.
+
+> נבדק: התקנה נקייה והפעלה ידנית ב-Windows. הגדרת השירות עם NSSM וקיצור ההפעלה לא נבדקו על מחשב נקי, ואם משהו לא עובד, פתחו Issue.
+
 ## הגדרה ראשונה בדשבורד (5 דקות)
 
 1. **סיסמה (עשו קודם!):** הגדרות ← "אבטחה ומערכת" ← "סיסמה לדשבורד". עד שמגדירים, כל מי שברשת יכול להיכנס. החשבון הראשון שמקבל סיסמה הוא **המנהל**: רואה את כל החשבונות ואת הגדרות המערכת. לכל חשבון נוסף אפשר לקבוע סיסמה משלו, והוא רואה רק את עצמו.

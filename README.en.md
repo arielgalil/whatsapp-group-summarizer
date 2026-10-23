@@ -55,6 +55,64 @@ sudo systemctl enable --now whatsapp-summarizer
 journalctl -u whatsapp-summarizer -f         # logs
 ```
 
+## Install on Windows
+
+Works like Linux, with a few differences. Suited to an old PC that stays on.
+
+### 1. Install Node.js and Git
+
+In PowerShell (or from [nodejs.org](https://nodejs.org) and [git-scm.com](https://git-scm.com/download/win)):
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+winget install Git.Git
+```
+
+Close the window and open a new PowerShell. `node -v` should show 18 or newer.
+
+### 2. Get it, install, run
+
+```powershell
+git clone https://github.com/arielgalil/whatsapp-group-summarizer.git whatsapp-summarizer
+cd whatsapp-summarizer
+npm install
+npm start
+```
+
+On first start Windows asks about the firewall: allow **private networks**. The dashboard opens at `http://localhost:3000` on the same PC. From a phone on the same network use the PC's address (`ipconfig`, the IPv4 line): `http://<address>:3000`. Continue with "First-time setup" below. Stop with `Ctrl+C` (the server saves its files before exiting).
+
+### 3. Keep it running
+
+**Simple option, nothing extra to install:** put a shortcut to `deploy\windows-start.bat` in your Startup folder (`Win+R`, then `shell:startup`). The server starts when you sign in and restarts if it crashes. Fits a PC where the user stays signed in.
+
+**Recommended option, a service that runs without signing in**, using [NSSM](https://nssm.cc). In PowerShell **as Administrator**, from the project folder:
+
+```powershell
+winget install NSSM.NSSM
+$dir = (Get-Location).Path
+$node = (Get-Command node).Source
+nssm install WhatsAppSummarizer $node "--experimental-global-webcrypto server.js"
+nssm set WhatsAppSummarizer AppDirectory $dir
+nssm set WhatsAppSummarizer AppStopMethodConsole 20000      # sends Ctrl+C and waits up to 20 s for the save
+nssm set WhatsAppSummarizer AppExit Default Restart
+nssm set WhatsAppSummarizer AppStdout "$dir\server.log"
+nssm set WhatsAppSummarizer AppStderr "$dir\server.log"
+nssm set WhatsAppSummarizer AppRotateFiles 1
+nssm start WhatsAppSummarizer
+```
+
+Stop / start: `nssm stop WhatsAppSummarizer`, `nssm start WhatsAppSummarizer`. The log is `server.log` in the folder.
+
+### 4. Windows specifics
+
+- **Sleep:** Settings, System, Power, Sleep: **Never** (when plugged in). A sleeping PC receives nothing.
+- **Windows Update** reboots the PC. The service (or the startup shortcut) comes back by itself, but messages sent while it was off are not recovered.
+- **Do not kill the process** (Task Manager) while it is receiving: a normal stop (`Ctrl+C` or `nssm stop`) saves the files; a sudden kill can leave encryption keys half-written.
+- **Diagnostics:** `curl.exe http://localhost:3000/_diag` (counters only, no content).
+- **Updating:** stop the service, `git pull`, `npm install`, start it.
+
+> Tested: a clean install and a manual start on Windows. The NSSM service and the startup shortcut were not tested on a clean PC; if something fails, please open an Issue.
+
 ## First-time setup (5 minutes)
 
 1. **Password first:** Settings, "Security and system", "Dashboard password". Until you set one, anyone on your network can open the dashboard.

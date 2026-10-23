@@ -1,0 +1,20 @@
+{
+  "name": "whatsapp-group-summarizer",
+  "version": "1.0.0",
+  "description": "Reads your WhatsApp groups, asks Gemini what matters, and sends you a short summary. Runs on a Raspberry Pi.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node --experimental-global-webcrypto server.js",
+    "test": "node test/unit.cjs"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.7.24",
+    "express": "^4.19.2",
+    "pino": "^9.0.0",
+    "qrcode": "^1.5.3"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "port": 3000,
+  "countryCode": "972",
+  "geminiApiKey": "",
+  "_note": "Optional. The server creates config.json by itself on the first start; you normally never edit it. Never commit config.json."
+}

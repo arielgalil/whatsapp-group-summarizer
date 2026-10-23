@@ -1,0 +1,21 @@
+[Unit]
+Description=WhatsApp Group Summarizer (server + web dashboard)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Change User and the two paths below to your own user and install folder
+User=pi
+WorkingDirectory=/home/pi/whatsapp-summarizer
+ExecStart=/usr/bin/env node --experimental-global-webcrypto server.js
+Restart=always
+RestartSec=10
+# Give the server time to save its files before it is stopped (see README, "Restarts")
+TimeoutStopSec=30
+Nice=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+# NEVER commit any of these: they hold WhatsApp credentials, your messages and your API key
+auth/
+auth/*.prev
+auth/*.stale-*
+data/
+backups/
+config.json
+config.json.tmp
+*.rollback
+*.tmp
+*.tgz
+.env
+.env.*
+
+node_modules/
+npm-debug.log*
+.DS_Store
+Thumbs.db

@@ -64,10 +64,32 @@ npm install
 npm start        # then open http://localhost:3000
 ```
 
-**By default the server listens on this machine only (`127.0.0.1`)**, so it is not exposed to your network unless you choose to. On a headless machine (a Raspberry Pi over SSH) there are two ways to open the dashboard from your own computer or phone:
+### How to open the dashboard
 
-1. **SSH tunnel (safest, nothing is opened to the network):** on your computer run `ssh -L 3000:localhost:3000 <user>@<pi-address>`, then open `http://localhost:3000`.
-2. **Open it to your home network:** start with `HOST=0.0.0.0 npm start` and open `http://<pi-ip>:3000` (`hostname -I` shows the IP). **Set a password right away** (see "First-time setup"). Until you do, the server answers only the local network.
+**For security the server is reachable, by default, only from the machine it runs on.** What you do depends on where it is installed:
+
+| Your situation | What to do |
+|---|---|
+| **The machine has a screen and a browser** (for example Windows, or a Raspberry Pi with a monitor) | Open `http://localhost:3000` in the browser. That is all. |
+| **No screen** (a Raspberry Pi in a cupboard that you reach over SSH) | Pick one of the two options below. |
+
+**Option A. SSH tunnel (the simplest and the safest):** on your own computer, in a terminal, run:
+
+```bash
+ssh -L 3000:localhost:3000 <user>@<pi-address>
+```
+
+Leave that window open and open `http://localhost:3000` in the browser **on your own computer**. Continue with the setup from there. (On Windows, `ssh` is available in PowerShell.)
+
+**Option B. Open it to every device at home (the phone too):**
+
+1. Start the server like this: `HOST=0.0.0.0 npm start`
+2. Open `http://<pi-ip-address>:3000` in a browser (`hostname -I` shows the address).
+3. **Set a password right away** (see "First-time setup"). Until you do, the server answers only your home network.
+
+When you run it as a permanent service (step 4 below), in `deploy/whatsapp-summarizer.service` delete the `#` at the start of the line `#Environment=HOST=0.0.0.0`, then restart the service.
+
+Stop the manual run with `Ctrl+C`.
 
 Run it permanently with systemd:
 

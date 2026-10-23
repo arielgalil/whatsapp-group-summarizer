@@ -135,6 +135,14 @@
     .chip.accent { background: var(--surface-2); color: var(--text); }
 
     /* Switch */
+    /* checkboxes and radio buttons drawn by us: the native ones ignore the theme and render dark on some browsers */
+    input[type=checkbox], input[type=radio] { -webkit-appearance: none; appearance: none; flex: none; width: 22px; height: 22px; margin: 0; display: inline-grid; place-content: center; border: 2px solid var(--faint); background: transparent; cursor: pointer; }
+    input[type=checkbox] { border-radius: 6px; }
+    input[type=radio] { border-radius: 50%; }
+    input[type=checkbox]:checked { background: var(--accent); border-color: var(--accent); }
+    input[type=checkbox]:checked::after { content: ''; width: 6px; height: 11px; border: solid var(--accent-ink); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg) translate(-1px, -1px); }
+    input[type=radio]:checked { border-color: var(--accent); }
+    input[type=radio]:checked::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
     .sw { flex: none; width: 48px; height: 28px; border-radius: 14px; background: var(--track); position: relative; transition: background .15s; }
     .sw::after { content: ''; position: absolute; top: 3px; inset-inline-start: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s; }
     .sw[aria-checked="true"] { background: var(--accent); }

@@ -15,6 +15,16 @@
 - **התראות לטלפון** (ntfy) כשהחיבור נופל או סיכום נכשל.
 - **ייבוא היסטוריה, גיבויים יומיים, ושמירה של 7 ימים בלבד.**
 
+## איך זה נראה
+
+<table dir="ltr"><tr>
+<td align="center"><img src="docs/screenshots/home.png" width="240"><br><sub>בית: מצב, הסיכומים של היום והסיכום האחרון</sub></td>
+<td align="center"><img src="docs/screenshots/collections.png" width="240"><br><sub>אוספים: שעה והנחיה לכל אוסף</sub></td>
+<td align="center"><img src="docs/screenshots/groups.png" width="240"><br><sub>קבוצות: מעקב, ושיוך לאוסף</sub></td>
+</tr></table>
+
+> כל השמות, המספרים והטקסטים בתמונות הם **נתוני דוגמה**. אין בהם מידע אמיתי. יש גם מצב כהה, לפי הגדרות הטלפון.
+
 ## לפני שמתחילים: חשוב לדעת
 
 > **אזהרות. קראו לפני ההתקנה.**
@@ -169,6 +179,16 @@ nssm start WhatsAppSummarizer
 - **"אין משהו חשוב/דחוף"** נרשם בהיסטוריה, ולא נשלחת הודעה.
 - **הנחיה ל-AI:** הנחיה כללית בהגדרות, והנחיה נוספת לכל אוסף. כך שולטים במה נחשב חשוב.
 - **מועד שכבר עבר** לא נחשב דחוף.
+
+<table dir="ltr"><tr>
+<td align="center"><img src="docs/screenshots/edit-collection.png" width="240"><br><sub>עריכת אוסף: שם, שעה, קבוצות והנחיה</sub></td>
+<td align="center"><img src="docs/screenshots/move-group.png" width="240"><br><sub>לחיצה על קבוצה: העברה לאוסף אחר</sub></td>
+<td align="center"><img src="docs/screenshots/auto-reply.png" width="240"><br><sub>כלל מענה אוטומטי</sub></td>
+</tr><tr>
+<td align="center"><img src="docs/screenshots/settings.png" width="240"><br><sub>הגדרות</sub></td>
+<td align="center"><img src="docs/screenshots/login.png" width="240"><br><sub>כניסה עם סיסמה</sub></td>
+<td align="center"><img src="docs/screenshots/home-dark.png" width="240"><br><sub>מצב כהה</sub></td>
+</tr></table>
 
 ### מענה אוטומטי
 

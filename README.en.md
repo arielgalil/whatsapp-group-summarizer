@@ -13,6 +13,16 @@ A small self-hosted server that listens to your WhatsApp groups, asks Google Gem
 - **Phone alerts** (ntfy) when the link drops or a summary fails.
 - History import, daily backups, 7-day message retention.
 
+## What it looks like
+
+<table><tr>
+<td align="center"><img src="docs/screenshots/home.png" width="240"><br><sub>Home: status, today's summaries, the last summary</sub></td>
+<td align="center"><img src="docs/screenshots/collections.png" width="240"><br><sub>Collections: time and prompt per collection</sub></td>
+<td align="center"><img src="docs/screenshots/groups.png" width="240"><br><sub>Groups: monitoring and assigning to a collection</sub></td>
+</tr></table>
+
+> All names, numbers and texts in the images are **demo data**; nothing real. A dark mode follows the phone's setting.
+
 ## Read this first
 
 > - **This is not an official WhatsApp tool.** It links as a "companion device" through an unofficial library ([Baileys](https://github.com/WhiskeySockets/Baileys)). That goes against WhatsApp's terms of service and your account can be restricted or banned. Use at your own risk, ideally with a number you can afford to lose.
@@ -54,6 +64,16 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now whatsapp-summarizer
 journalctl -u whatsapp-summarizer -f         # logs
 ```
+
+<table><tr>
+<td align="center"><img src="docs/screenshots/edit-collection.png" width="240"><br><sub>Edit a collection: name, time, groups, prompt</sub></td>
+<td align="center"><img src="docs/screenshots/move-group.png" width="240"><br><sub>Tap a group: move it to another collection</sub></td>
+<td align="center"><img src="docs/screenshots/auto-reply.png" width="240"><br><sub>An auto-reply rule</sub></td>
+</tr><tr>
+<td align="center"><img src="docs/screenshots/settings.png" width="240"><br><sub>Settings</sub></td>
+<td align="center"><img src="docs/screenshots/login.png" width="240"><br><sub>Password sign-in</sub></td>
+<td align="center"><img src="docs/screenshots/home-dark.png" width="240"><br><sub>Dark mode</sub></td>
+</tr></table>
 
 ## Install on Windows
 

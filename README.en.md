@@ -4,6 +4,13 @@ A small self-hosted server that listens to your WhatsApp groups, asks Google Gem
 
 [עברית / Hebrew README](README.md)
 
+> ## ⚠️ Disclaimer: read carefully before any use
+>
+> **Use of this software is entirely at your own risk.** It is provided "AS IS", **without warranty of any kind**. It is **not an official product** of WhatsApp, Meta or Google, and connects to WhatsApp in an **unofficial** way that may **violate their terms of service and get your WhatsApp account permanently banned**. Message content **is sent to Google Gemini**, and you alone are responsible for the lawfulness of that processing, for privacy and for participants' consent. Summaries are AI-generated and **may be wrong or omit urgent information**: do not rely on them for anything critical. The authors are **not liable for any damages**, including loss of an account or data.
+>
+> **Using, installing or running the software means you accept the [full Disclaimer and Terms of Use](DISCLAIMER.md).** If you do not agree, do not use it.
+
+
 ## Features
 
 - **Collections:** group your chats by topic ("Work", "Family", "Kids"), each with its own send time and its own prompt. Each morning you get a summary of the **previous day** per collection.
@@ -24,6 +31,8 @@ A small self-hosted server that listens to your WhatsApp groups, asks Google Gem
 > All names, numbers and texts in the images are **demo data**; nothing real. A dark mode follows the phone's setting.
 
 ## Read this first
+
+The full, binding text is in the [Disclaimer](DISCLAIMER.md). The key points:
 
 > - **This is not an official WhatsApp tool.** It links as a "companion device" through an unofficial library ([Baileys](https://github.com/WhiskeySockets/Baileys)). That goes against WhatsApp's terms of service and your account can be restricted or banned. Use at your own risk, ideally with a number you can afford to lose.
 > - **Privacy:** group names, sender names and message text of the groups you choose are **sent to Google Gemini**. On the free tier Google may use the data. Do not include sensitive groups (medical, legal, other people's personal data) unless you accept that. A paid key has different terms.

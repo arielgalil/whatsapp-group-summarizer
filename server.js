@@ -286,7 +286,7 @@ async function initAccountSession(accountId, manual = false) {
       syncFullHistory: false,
       // The CPU profile showed the Pi spending almost all its time decoding incoming WhatsApp traffic, and
       // missing the keep-alive (408) while doing so. Status stories and channels are useless here and were
-      // being decrypted too; fewer retries and a longer keep-alive give the event loop room to breathe.
+      // being decrypted too; fewer retries give the event loop room to breathe.
       // Groups that are not monitored are not even decrypted (hundreds of busy groups were saturating the Pi).
       // Private chats stay on: the auto-reply needs them.
       shouldIgnoreJid: (jid) => {
@@ -306,7 +306,9 @@ async function initAccountSession(accountId, manual = false) {
         const g = acc && acc.monitoredGroups && acc.monitoredGroups[jid];
         return !(g && (g.enabled || isInCollection(acc, jid)));
       },
-      keepAliveIntervalMs: 60000,
+      // Keep-alive ping every 25 s. WhatsApp closes a link that has been silent for about a minute (428): with a
+      // 60 s ping, every quiet period (nights, Shabbat) dropped the connection 57 s after each reconnect.
+      keepAliveIntervalMs: 25000,
       maxMsgRetryCount: 2,
       markOnlineOnConnect: false,
       // Baileys discards ALL history when syncFullHistory is false. Accept only the recent kinds

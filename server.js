@@ -861,6 +861,99 @@ function redactSensitive(text) {
     .replace(/(סיסמה|סיסמא|password|passcode|pin|קוד אימות|קוד חד פעמי|otp)[^\n:=]{0,30}[:=]\s*\S+/gi, '$1: [הוסתר]');
 }
 
+/* OUTBOX START */
+// Outgoing messages wait in a queue on disk (data/outbox.json) until WhatsApp accepts them:
+//  - nothing is lost when the service stops, crashes or the link is down (it is retried with back-off, up to 6 h)
+//  - each job has a fixed id; a scheduled summary's id is account|job|day|recipient, so a restart cannot queue it twice
+//  - the WhatsApp message id is derived from the job id: if the Pi dies after sending but before writing "sent",
+//    the resend carries the same id and the phone shows the message once
+const OUTBOX_FILE = path.join(DATA_DIR, 'outbox.json');
+const OUTBOX_GIVE_UP_MS = 6 * 3600 * 1000;
+let outbox = [];
+try { outbox = JSON.parse(fs.readFileSync(OUTBOX_FILE, 'utf8')); } catch (e) {}
+function saveOutbox() {
+  try { fs.writeFileSync(OUTBOX_FILE + '.tmp', JSON.stringify(outbox), { mode: 0o600 }); fs.renameSync(OUTBOX_FILE + '.tmp', OUTBOX_FILE); } catch (e) { console.error('[Outbox] save failed:', e.message); }
+}
+function outboxMessageId(jobId) {
+  return '3EB0' + crypto.createHash('sha256').update(String(jobId)).digest('hex').toUpperCase().slice(0, 18);
+}
+function outboxBackoff(attempts) {
+  return Math.min(30000 * 2 ** Math.max(0, attempts - 1), 15 * 60 * 1000);
+}
+function enqueueSend({ id, accountId, to, text, historyId }) {
+  if (outbox.some(j => j.id === id)) { console.log(`[Outbox] ${id} already queued or sent - skipped`); return false; }
+  outbox.push({ id, accountId, to, text, historyId, status: 'pending', attempts: 0, createdAt: Date.now(), nextAt: Date.now() });
+  saveOutbox();
+  return true;
+}
+// The history entry of a summary follows its deliveries: sent as soon as one recipient got it, failed if none did
+function updateDelivery(historyId) {
+  if (!historyId) return;
+  const jobs = outbox.filter(j => j.historyId === historyId);
+  const h = sendHistory.find(x => x.id === historyId);
+  if (!h || !jobs.length) return;
+  const sent = jobs.filter(j => j.status === 'sent').length;
+  const open = jobs.some(j => j.status === 'pending' || j.status === 'sending');
+  const next = sent ? 'sent' : open ? 'queued' : 'failed';
+  if (h.status === next && h.recipients === sent) return;
+  h.status = next; h.recipients = sent;
+  if (next === 'failed') h.error = 'השליחה לוואטסאפ נכשלה (נוסה במשך 6 שעות)';
+  else delete h.error;
+  try { fs.writeFileSync(HISTORY_FILE + '.tmp', JSON.stringify(sendHistory), 'utf8'); fs.renameSync(HISTORY_FILE + '.tmp', HISTORY_FILE); } catch (e) {}
+  if (next === 'failed') notify(`fail:${h.accountId}:${h.collectionId || h.label}`, `⚠️ ${config.accounts[h.accountId]?.name || h.accountId}: הסיכום "${String(h.label || '').replace(/^אוסף: /, '')}" לא נשלח: ${h.error}`, { repeatHours: 3 });
+}
+let outboxBusy = false;
+async function outboxTick() {
+  if (outboxBusy) return;
+  outboxBusy = true;
+  try {
+    for (const job of outbox) {
+      if (job.status !== 'pending' && job.status !== 'sending') continue;
+      const now = Date.now();
+      if (now - job.createdAt > OUTBOX_GIVE_UP_MS) {
+        job.status = 'failed'; saveOutbox();
+        logError('send', `השליחה ל-${job.to.split('@')[0].slice(-4).padStart(8, '•')} נכשלה אחרי ${job.attempts} ניסיונות: ${job.error || 'אין חיבור'}`, job.accountId);
+        updateDelivery(job.historyId);
+        continue;
+      }
+      if (job.nextAt > now) continue;
+      const s = sessions[job.accountId];
+      if (!s || s.status !== 'connected' || !s.sock) continue; // wait for the link; not counted as an attempt
+      job.status = 'sending'; job.attempts++; saveOutbox();
+      try {
+        rememberSent(await s.sock.sendMessage(job.to, { text: job.text }, { messageId: outboxMessageId(job.id) }));
+        job.status = 'sent'; job.sentAt = Date.now(); delete job.text; delete job.error; saveOutbox();
+        console.log(`[${job.accountId}] Summary sent to ${job.to}${job.attempts > 1 ? ` (attempt ${job.attempts})` : ''}`);
+      } catch (e) {
+        job.status = 'pending'; job.error = String(e && e.message || e).slice(0, 200); job.nextAt = Date.now() + outboxBackoff(job.attempts); saveOutbox();
+        console.error(`[${job.accountId}] [Outbox] send to ${job.to} failed (attempt ${job.attempts}): ${job.error}`);
+      }
+      updateDelivery(job.historyId);
+    }
+    // finished jobs are kept 3 days, so a repeated job id is still recognised as already sent
+    const keepFrom = Date.now() - 3 * 86400 * 1000;
+    const before = outbox.length;
+    outbox = outbox.filter(j => j.status === 'pending' || j.status === 'sending' || (j.sentAt || j.createdAt) > keepFrom);
+    if (outbox.length !== before) saveOutbox();
+  } finally {
+    outboxBusy = false;
+  }
+}
+setInterval(() => { outboxTick().catch(e => console.error('[Outbox]', e.message)); }, 15000);
+/* OUTBOX END */
+
+// Error log for the dashboard (data/errors.jsonl): what failed and when, without message content. 500 lines kept.
+const ERROR_FILE = path.join(DATA_DIR, 'errors.jsonl');
+function logError(kind, text, accountId) {
+  try { fs.appendFileSync(ERROR_FILE, JSON.stringify({ ts: Date.now(), kind, accountId: accountId || null, text: String(text).slice(0, 300) }) + '\n', { mode: 0o600 }); } catch (e) {}
+}
+function trimErrorLog() {
+  try {
+    const lines = fs.readFileSync(ERROR_FILE, 'utf8').split('\n').filter(Boolean);
+    if (lines.length > 500) { fs.writeFileSync(ERROR_FILE + '.tmp', lines.slice(-500).join('\n') + '\n', { mode: 0o600 }); fs.renameSync(ERROR_FILE + '.tmp', ERROR_FILE); }
+  } catch (e) {}
+}
+
 // Gemini Summarizer Function
 // windowMode: '24h' (manual runs: the last 24 hours) or 'yesterday' (scheduled runs: the previous calendar day, 00:00-24:00)
 // meta: extra fields for the history entry, e.g. { collectionId } so renaming a collection keeps its history
@@ -989,51 +1082,36 @@ async function summarizeAccount(accountId, targetJids = null, scheduleLabel = ''
   accConfig.lastSummary = new Date().toISOString();
   saveConfig(true);
 
-  // Determine delivery recipients
+  // Recipients. The own number comes from the live socket or, while reconnecting, from the last known login.
   const recipients = [];
-  if (accConfig.sendToSelf !== false && session?.sock?.user?.id) {
-    const myJid = session.sock.user.id.split(':')[0] + '@s.whatsapp.net';
-    recipients.push(myJid);
-  }
+  const ownId = session?.sock?.user?.id || session?.user?.id;
+  if (accConfig.sendToSelf !== false && ownId) recipients.push(ownId.split(':')[0] + '@s.whatsapp.net');
   if (accConfig.sendToCustomPhone && accConfig.customPhone) {
     const customJid = formatWhatsAppJid(accConfig.customPhone);
-    if (customJid && !recipients.includes(customJid)) {
-      recipients.push(customJid);
-    }
+    if (customJid && !recipients.includes(customJid)) recipients.push(customJid);
   }
 
-  let delivered = 0;
-  if (session?.sock) {
-    const tag = scheduleLabel ? ` (${scheduleLabel})` : '';
-    const header = windowMode === 'yesterday'
-      ? `📋 *סיכום אתמול${tag} - ${accConfig.name}*\n_${yesterdayLabel}_\n\n`
-      : `📋 *סיכום יומי${tag} - ${accConfig.name}*\n_${new Date().toLocaleDateString('he-IL')}_\n\n`;
+  const tag = scheduleLabel ? ` (${scheduleLabel})` : '';
+  const header = windowMode === 'yesterday'
+    ? `📋 *סיכום אתמול${tag} - ${accConfig.name}*\n_${yesterdayLabel}_\n\n`
+    : `📋 *סיכום יומי${tag} - ${accConfig.name}*\n_${new Date().toLocaleDateString('he-IL')}_\n\n`;
 
-    // A drop in the connection must not lose the summary: retry for up to 10 minutes, waiting for reconnects
-    for (const targetJid of recipients) {
-      const until = Date.now() + 10 * 60 * 1000;
-      for (let attempt = 1; ; attempt++) {
-        const s = sessions[accountId];
-        try {
-          if (!s || s.status !== 'connected' || !s.sock) throw new Error('not connected');
-          rememberSent(await s.sock.sendMessage(targetJid, { text: header + summary }));
-          delivered++;
-          console.log(`[${accountId}] Summary sent to ${targetJid}${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
-          break;
-        } catch (sendErr) {
-          if (Date.now() > until) { console.error(`[${accountId}] Failed to send summary to ${targetJid}:`, sendErr.message); break; }
-          await new Promise(r => setTimeout(r, 15000));
-        }
-      }
-    }
-  }
-
+  // Hand the message to the outbox (kept on disk): it survives a crash or a night without a link, and a
+  // scheduled summary has a fixed id per day and recipient, so it can never be queued or delivered twice.
+  const hid = crypto.randomBytes(6).toString('hex');
+  const runKey = meta.jobKey ? `${meta.jobKey}|${dateKey(new Date())}` : `manual|${hid}`;
+  for (const to of recipients) enqueueSend({ id: `${accountId}|${runKey}|${to}`, accountId, to, text: header + summary, historyId: hid });
+  const { jobKey, ...histMeta } = meta;
   addHistory({
-    accountId, label: scheduleLabel || 'יזום', ...meta,
-    status: delivered > 0 ? 'sent' : 'failed',
-    error: delivered > 0 ? undefined : (session?.sock ? 'השליחה לוואטסאפ נכשלה' : 'וואטסאפ לא מחובר'),
-    text: summary, groups: groupCount, messages: msgCount, recipients: delivered, model: usedModel
+    id: hid, accountId, label: scheduleLabel || 'יזום', ...histMeta,
+    status: recipients.length ? 'queued' : 'failed', error: recipients.length ? undefined : 'אין למי לשלוח (אין מספר מחובר ואין מספר נוסף)',
+    text: summary, groups: groupCount, messages: msgCount, recipients: 0, model: usedModel
   });
+  outboxTick();
+  // a manual run waits a little, so the dashboard can say "sent" rather than "queued"
+  if (windowMode !== 'yesterday') {
+    for (let i = 0; i < 20 && outbox.some(j => j.historyId === hid && (j.status === 'pending' || j.status === 'sending')); i++) await new Promise(r => setTimeout(r, 1000));
+  }
   return summary;
 }
 
@@ -1120,7 +1198,7 @@ async function schedulerTick() {
     const started = Date.now();
     let failed = false;
     try {
-      await runExclusive({ accountId: job.accId, label: job.label }, () => summarizeAccount(job.accId, job.jids, job.label, 'yesterday', job.meta || {}), true);
+      await runExclusive({ accountId: job.accId, label: job.label }, () => summarizeAccount(job.accId, job.jids, job.label, 'yesterday', { ...(job.meta || {}), jobKey: job.key }), true);
     } catch (err) {
       failed = true;
       console.error(`[Scheduler] Error in ${job.label} for ${job.accId}:`, err.message);
@@ -1269,7 +1347,7 @@ app.use('/api', (req, res, next) => {
   if (me.manager) return next();
   const acc = req.path.match(/^\/(?:accounts|qr)\/([^/]+)/);
   if (acc && acc[1] !== me.accountId) return res.status(403).json({ ok: false, error: 'אין הרשאה לחשבון הזה' });
-  if (/^\/(config|gemini)\//.test(req.path) || req.path === '/accounts/add') return res.status(403).json({ ok: false, error: 'רק מנהל המערכת יכול לשנות את זה' });
+  if (/^\/(config|gemini)\//.test(req.path) || req.path === '/accounts/add' || req.path === '/errors') return res.status(403).json({ ok: false, error: 'רק מנהל המערכת יכול לשנות את זה' });
   next();
 });
 app.post('/api/auth/login', (req, res) => {
@@ -1406,6 +1484,14 @@ app.get('/api/status', (req, res) => {
   res.set({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Vary': 'Accept-Encoding' });
   if (wantsGzip(req)) { res.set('Content-Encoding', 'gzip'); return res.send(zlib.gzipSync(body)); }
   res.send(body);
+});
+
+// API: error log (manager only), newest first
+app.get('/api/errors', (req, res) => {
+  let rows = [];
+  try { rows = fs.readFileSync(ERROR_FILE, 'utf8').split('\n').filter(Boolean).slice(-60).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean).reverse(); } catch (e) {}
+  const names = Object.fromEntries(Object.entries(config.accounts).map(([id, a]) => [id, a.name]));
+  res.json({ ok: true, errors: rows.map(r => ({ ...r, account: r.accountId ? names[r.accountId] || r.accountId : null })) });
 });
 
 // API: Get QR code for an account
@@ -1685,7 +1771,8 @@ app.post('/api/accounts/:id/summarize', async (req, res) => {
     const targetJids = Array.isArray(jids) && jids.length ? jids : (jid ? [jid] : null);
     const lbl = label || (jid ? 'סיכום קבוצה ממוקד' : 'יזום');
     const summary = await runExclusive({ accountId: id, label: lbl }, () => summarizeAccount(id, targetJids, lbl, '24h', collectionId ? { collectionId } : {}));
-    res.json({ ok: true, summary });
+    const last = sendHistory.filter(h => h.accountId === id).slice(-1)[0];
+    res.json({ ok: true, summary, delivery: last && last.status });
   } catch (err) {
     if (!err.busy) console.error(`[summarize] ${err.message}`);
     res.status(err.busy ? 409 : 500).json({ ok: false, busy: Boolean(err.busy), error: err.busy ? err.message : (/^Gemini API error|No summary text/.test(err.message) ? 'שירות ה-AI לא זמין או עמוס כרגע. נסו שוב בעוד רגע.' : 'הסיכום נכשל. הפרטים ביומן השרת.') });
@@ -1761,6 +1848,7 @@ async function notify(key, text, { repeatHours = 6 } = {}) {
   if (alertSent[key] && Date.now() - alertSent[key] < repeatHours * 3600 * 1000) return;
   alertSent[key] = Date.now();
   console.error(`[Alert] ${text}`);
+  logError('alert', text);
   const topic = config.alerts && config.alerts.ntfyTopic;
   if (!topic) return;
   try {
@@ -1854,8 +1942,8 @@ function shutdown(sig) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 // An unexpected error in one handler must not take down every account (and cut file writes short)
-process.on('uncaughtException', (e) => console.error('[Fatal-ignored] uncaughtException:', e && e.stack || e));
-process.on('unhandledRejection', (e) => console.error('[Fatal-ignored] unhandledRejection:', e && e.stack || e));
+process.on('uncaughtException', (e) => { console.error('[Fatal-ignored] uncaughtException:', e && e.stack || e); logError('crash', `שגיאה לא צפויה: ${e && e.message || e}`); });
+process.on('unhandledRejection', (e) => { console.error('[Fatal-ignored] unhandledRejection:', e && e.stack || e); logError('crash', `שגיאה לא צפויה: ${e && e.message || e}`); });
 
 // API: phone alerts
 app.post('/api/config/alerts', (req, res) => {
@@ -1890,6 +1978,9 @@ app.listen(PORT, HOST, () => {
   }
   pruneMessages();
   setInterval(pruneMessages, 6 * 3600 * 1000);
+  trimErrorLog();
+  setInterval(trimErrorLog, 6 * 3600 * 1000);
+  logError('start', `השרת הופעל${outbox.some(j => j.status === 'pending' || j.status === 'sending') ? ` (${outbox.filter(j => j.status === 'pending' || j.status === 'sending').length} הודעות ממתינות בתור)` : ''}`);
   setTimeout(snapshotBackups, 90 * 1000);
   setInterval(snapshotBackups, 6 * 3600 * 1000);
   setInterval(healthTick, 5 * 60 * 1000);

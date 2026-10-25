@@ -393,6 +393,7 @@
             <div class="set-row" id="logoutRow" hidden><span class="ri"><svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/></svg></span><div class="txt"><div class="lbl">יציאה</div><div class="d" id="meD"></div></div><button class="btn small" data-act="logout">יציאה</button></div>
             <div class="set-row mgr"><span class="ri"><svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15L6 17Z"/><path d="M10 21h4"/></svg></span><div class="txt"><div class="lbl">התראות לטלפון</div><div class="d" id="alertD"></div></div><button class="btn small" data-act="editAlerts">הגדרה</button></div>
             <div class="set-row mgr"><span class="ri"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M16 7l3 3"/></svg></span><div class="txt"><div class="lbl">מפתח Gemini</div><div class="d" id="gemD"></div></div><button class="btn small" data-act="editKey">שינוי</button></div>
+            <div class="set-row mgr"><span class="ri"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg></span><div class="txt"><div class="lbl">יומן תקלות</div><div class="d">ניתוקים, שליחות שנכשלו והפעלות של השרת</div></div><button class="btn small" data-act="showErrors">הצגה</button></div>
           </div>
           <div class="sys" id="sys"></div>
         </div>
@@ -440,6 +441,7 @@
     empty: { cls: '', pre: '', txt: 'אין משהו חשוב/דחוף' },
     failed: { cls: 'bad', pre: '', txt: 'נכשל' },
     running: { cls: '', pre: '', txt: 'בתהליך…', g: true },
+    queued: { cls: 'warn', pre: '', txt: 'ממתין לשליחה (יישלח כשהחיבור יחזור)' },
     missed: { cls: 'warn', pre: '', txt: 'לא הורץ' },
     upcoming: { cls: '', pre: '', txt: inText(mins || 0), g: true }
   }[st] || { cls: '', pre: '', txt: st });
@@ -977,6 +979,7 @@
       else if (!d.ok) toast(d.error ? 'לא הצליח: ' + d.error.slice(0, 90) : 'לא הצליח');
       else if (/^אין משהו חשוב/.test(d.summary || '')) toast('אין משהו חשוב או דחוף, לא נשלחה הודעה');
       else if (/^(אין הודעות|לא נמצאו)/.test(d.summary || '')) toast('אין הודעות חדשות לסכם');
+      else if (d.delivery === 'queued') toast('הסיכום מוכן וממתין בתור. הוא יישלח ברגע שהחיבור לוואטסאפ יחזור.', 6000);
       else toast('הסיכום נשלח');
     } catch (e) { toast('התקשורת נותקה. ייתכן שהסיכום עדיין נשלח, בדקו בהיסטוריה'); }
     busy = false; load(true);
@@ -1200,6 +1203,13 @@
     async logout() {
       await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
       showLogin();
+    },
+    async showErrors() {
+      const d = await api('/api/errors');
+      if (!d.ok) return toast(d.error || 'לא ניתן לטעון את היומן');
+      const kinds = { alert: 'התראה', send: 'שליחה', crash: 'שגיאה', start: 'הפעלה' };
+      const rows = (d.errors || []).map(e => `<div class="opt" style="display:block;min-height:0;padding:10px 4px"><div class="hint" style="margin-bottom:2px"><span class="num">${esc(whenLabel(e.ts))}</span> · ${esc(kinds[e.kind] || e.kind)}${e.account ? ' · ' + esc(e.account) : ''}</div><div>${esc(e.text)}</div></div>`).join('');
+      openSheet('יומן תקלות', rows || '<div class="empty">אין רישומים. הכול שקט.</div>');
     },
     async editKey() {
       openSheet('מפתח Gemini', `<p class="hint">אפשר ליצור מפתח חינמי ב-<a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Google AI Studio</a>.</p><label class="lbl2" for="kIn">המפתח</label><input id="kIn" type="password" class="field" dir="ltr" placeholder="AIza…" autocomplete="off">`,

@@ -11,11 +11,11 @@ const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
 const env = { sessions: {}, sendHistory: [], alerts: [], errors: [], sent: [] };
 function load() {
   // a fresh "process": the block re-reads data/outbox.json exactly as a restarted server would
-  const fn = new Function('fs', 'path', 'crypto', 'DATA_DIR', 'HISTORY_FILE', 'sessions', 'sendHistory', 'config', 'rememberSent', 'notify', 'logError', 'console', 'setInterval',
+  const fn = new Function('fs', 'path', 'crypto', 'DATA_DIR', 'HISTORY_FILE', 'sessions', 'sendHistory', 'config', 'rememberSent', 'notify', 'logError', 'console', 'setInterval', 'bumpDaily', 'dailyStats', 'dayKey', 'saveDaily',
     block + '\nreturn { enqueueSend, outboxTick, outboxMessageId, outboxBackoff, get outbox() { return outbox; } };');
   return fn(fs, path, crypto, DATA_DIR, HISTORY_FILE, env.sessions, env.sendHistory, { accounts: { a: { name: 'A' } } },
     () => {}, (k, text) => env.alerts.push(text), (kind, text) => env.errors.push(kind + ': ' + text),
-    { log() {}, error() {} }, () => 0);
+    { log() {}, error() {} }, () => 0, () => {}, {}, () => '2026-10-25', () => {});
 }
 const sock = (behaviour) => ({ sendMessage: async (to, content, opts) => { env.sent.push({ to, text: content.text, messageId: opts && opts.messageId }); if (behaviour === 'fail') throw new Error('boom'); return { key: { id: opts.messageId }, message: { conversation: content.text } }; } });
 const onDisk = () => JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'outbox.json'), 'utf8'));

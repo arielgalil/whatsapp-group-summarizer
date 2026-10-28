@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node --experimental-global-webcrypto server.js",
-    "test": "node test/unit.cjs && node test/outbox.cjs",
+    "test": "node test/unit.cjs && node test/outbox.cjs && node --test test/collections.test.mjs test/people.test.mjs test/device.test.mjs test/dashboard.test.mjs",
     "test:security": "node test/security.mjs"
   },
   "dependencies": {

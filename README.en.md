@@ -17,15 +17,17 @@ A small self-hosted server that listens to your WhatsApp groups, asks Google Gem
 - **Concise:** only what is important or urgent; nothing important means no message.
 - **Several accounts:** link more than one WhatsApp number (e.g. a couple). Each account has its own password and sees only itself; the first one with a password is the manager.
 - **Auto-reply:** a fixed message to chosen people during chosen hours, optionally lightly personalised by AI.
-- **Phone alerts** (ntfy) when the link drops or a summary fails.
+- **People collections:** a summary of your private chats with up to 10 important people, both what they wrote and what you wrote.
+- **Live home screen:** summaries sent, messages captured, the busiest groups, and the health of the device (temperature, memory, Wi-Fi, power). Tested on Raspberry Pi and Windows; designed for Linux and macOS too.
+- **Phone alerts** (ntfy) when an account stays disconnected for 5 minutes or more, or a summary fails. Short drops that reconnect by themselves do not alert.
 - History import, daily backups, 7-day message retention.
 
 ## What it looks like
 
 <table><tr>
-<td align="center"><img src="docs/screenshots/home.png" width="240"><br><sub>Home: status, today's summaries, the last summary</sub></td>
-<td align="center"><img src="docs/screenshots/collections.png" width="240"><br><sub>Collections: time and prompt per collection</sub></td>
-<td align="center"><img src="docs/screenshots/groups.png" width="240"><br><sub>Groups: monitoring and assigning to a collection</sub></td>
+<td align="center"><img src="docs/screenshots/home.png" width="240"><br><sub>Home: status, today's counters and scheduled summaries</sub></td>
+<td align="center"><img src="docs/screenshots/home-dashboard.png" width="240"><br><sub>Home: the last summary and charts (sections fold and unfold)</sub></td>
+<td align="center"><img src="docs/screenshots/collections.png" width="240"><br><sub>Collections: time and prompt per collection, with the default "General"</sub></td>
 </tr></table>
 
 > All names, numbers and texts in the images are **demo data**; nothing real. A dark mode follows the phone's setting.
@@ -102,13 +104,17 @@ journalctl -u whatsapp-summarizer -f         # logs
 ```
 
 <table><tr>
-<td align="center"><img src="docs/screenshots/edit-collection.png" width="240"><br><sub>Edit a collection: name, time, groups, prompt</sub></td>
-<td align="center"><img src="docs/screenshots/move-group.png" width="240"><br><sub>Tap a group: move it to another collection</sub></td>
-<td align="center"><img src="docs/screenshots/auto-reply.png" width="240"><br><sub>An auto-reply rule</sub></td>
+<td align="center"><img src="docs/screenshots/new-collection.png" width="240"><br><sub>New collection: groups or people</sub></td>
+<td align="center"><img src="docs/screenshots/edit-collection.png" width="240"><br><sub>Edit a group collection: name, time, groups, prompt</sub></td>
+<td align="center"><img src="docs/screenshots/edit-people.png" width="240"><br><sub>A people collection: up to 10 contacts</sub></td>
 </tr><tr>
+<td align="center"><img src="docs/screenshots/auto-reply.png" width="240"><br><sub>An auto-reply rule</sub></td>
 <td align="center"><img src="docs/screenshots/settings.png" width="240"><br><sub>Settings</sub></td>
+<td align="center"><img src="docs/screenshots/home-device.png" width="240"><br><sub>Device health on the home screen</sub></td>
+</tr><tr>
 <td align="center"><img src="docs/screenshots/login.png" width="240"><br><sub>Password sign-in</sub></td>
-<td align="center"><img src="docs/screenshots/home-dark.png" width="240"><br><sub>Dark mode</sub></td>
+<td align="center"><img src="docs/screenshots/home-dark.png" width="240"><br><sub>Dark mode: home</sub></td>
+<td align="center"><img src="docs/screenshots/collections-dark.png" width="240"><br><sub>Dark mode: collections</sub></td>
 </tr></table>
 
 ## Install on Windows
@@ -174,10 +180,10 @@ Stop / start: `nssm stop WhatsAppSummarizer`, `nssm start WhatsAppSummarizer`. T
 1. **Password first:** Settings, "Security and system", "Dashboard password". Until you set one, anyone on your network can open the dashboard.
 2. **Gemini key:** same section, "Gemini key".
 3. **Link WhatsApp:** on the home screen press "Show QR code", then on the phone WhatsApp, Linked devices, Link a device. The code is valid for about a minute and refreshes itself.
-4. **Pick groups:** "Groups" tab, switch on monitoring for the groups you want. **A group that is not monitored is not read at all.**
-5. **Create a collection:** "Collections" tab, green "+" button: name, send time, groups, optional extra prompt.
+4. **Create a group collection:** "Collections" tab, green "+" button, "Group collection": name, send time, and the groups (the list has a search box), plus an optional extra prompt. **Every group you pick is monitored, and a group in no collection is not read at all.**
+5. **People collection (optional):** the same "+" button, "People collection". See "People collections" below.
 6. **Test:** on home press the green floating button, choose a collection, "Summarize now" (last 24 hours).
-7. Monitored groups that are in no collection are summarised together as the "main summary" at its own time.
+7. **The "General" collection** is the default. A group in it is summarised at its time (you can change it). Every group belongs to exactly one collection.
 
 Capture starts only when the link is up and the group is monitored. Earlier messages are not available, except the short history WhatsApp sends right when you link a device (Settings, "History import").
 
@@ -185,8 +191,10 @@ Capture starts only when the link is up and the group is monitored. Earlier mess
 
 - Scheduled summaries cover the **previous calendar day**; "Summarize now" covers the last 24 hours.
 - "Nothing important/urgent" is recorded in the history and nothing is sent.
+- **People collections:** "Collections", "+", "People collection": a name, an optional time, up to 10 contacts (search by name or type a number) and an optional prompt. The summary covers your **private chats** with them in the last 24 hours, in both directions, one section per person. Only chats with the people you picked are stored, and only from the moment you add them; they are kept for 2 days (group messages: 7 days), so the first summary only contains messages since then. The chat text is **sent to Gemini**, like group text. Contacts that WhatsApp identifies by an internal id (`@lid`) are stored only if WhatsApp also provides their phone number.
+- **Home screen and device health:** today's counters (summaries sent and failed, messages captured), monitored groups, the busiest groups and 14-day charts. Sections fold and unfold and the state is remembered on the device. At the bottom, a device card: temperature, CPU, memory, Wi-Fi, free space, on a Raspberry Pi also power, and the Wi-Fi and WhatsApp drops of the last 24 hours. Readings are read-only and were tested on Raspberry Pi and Windows (Linux and macOS are designed but untested); a value the system cannot provide is simply not shown. Only the manager sees the device card.
 - **Auto-reply:** Settings, "Auto-reply". Private chats only, new messages only, at most 20 replies per hour, once per person per cool-down. AI personalisation is off by default; when on, the sender's first name and message are sent to Gemini and any failure falls back to your own text.
-- **Phone alerts:** install the free [ntfy](https://ntfy.sh) app, subscribe to **exactly** the topic name shown in Settings, press "Send test".
+- **Phone alerts:** install the free [ntfy](https://ntfy.sh) app, subscribe to **exactly** the topic name shown in Settings, press "Send test". An alert goes out when an account stays disconnected for 5 minutes or more, when capture stalls, when the server is overloaded and when a summary fails; short drops that reconnect by themselves are only logged.
 - **Remote access:** do not expose the dashboard to the internet. Use Tailscale on the server and your phone.
 - **Files:** `config.json` (settings, password hashes), `auth/` (WhatsApp keys, secret), `data/` (messages for 7 days, contacts, history), `backups/` (daily, 7 days). All are in `.gitignore`. Backups are on the same machine, so copy `config.json` and `auth/` somewhere safe now and then.
 
@@ -231,7 +239,7 @@ Diagnostics from the machine itself: `curl localhost:3000/_diag` (counters only,
 ## Development
 
 ```bash
-npm test       # unit tests for the pure logic
+npm test       # unit tests: time windows, phone numbers, the send queue, collections, private chats, device readings, daily counters
 ```
 
 One server file (`server.js`) and one static dashboard (`public/index.html`, no build step). Contributions welcome.

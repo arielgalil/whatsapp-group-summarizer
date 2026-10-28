@@ -60,7 +60,7 @@
     .acc-select { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; min-height: 40px; }
     .tabs {
       position: fixed; inset-inline: 0; bottom: 0; z-index: 20;
-      display: grid; grid-template-columns: repeat(4, 1fr);
+      display: grid; grid-template-columns: repeat(3, 1fr);
       background: var(--bg);
       padding-bottom: env(safe-area-inset-bottom);
     }
@@ -74,7 +74,7 @@
     .tab .dot { position: absolute; top: 12px; inset-inline-start: calc(50% + 8px); width: 9px; height: 9px; border-radius: 50%; background: var(--bad); border: 2px solid var(--surface); }
     @media (min-width: 720px) {
       body { padding-bottom: 48px; }
-      .tabs { position: static; display: inline-grid; grid-template-columns: repeat(4, auto); border: 1px solid var(--line); border-radius: 12px; margin-top: 14px; padding: 4px; gap: 2px; }
+      .tabs { position: static; display: grid; grid-template-columns: repeat(3, auto); width: max-content; margin: 14px auto 0; border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 2px; }
       .tab { flex-direction: row; gap: 8px; height: 40px; padding-inline: 16px; font-size: 0.92rem; border-radius: 9px; }
       .tab svg { width: 20px; height: 20px; }
       .tab[aria-selected="true"] { background: var(--surface-2); }
@@ -278,19 +278,37 @@
     .is-busy { opacity: .65; pointer-events: none; }
     @media (min-width: 720px) { .panel { border-radius: 20px; } #sheet { align-items: center; } }
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
-  </style>
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kpi-v { font-size: 1.6rem; font-weight: 700; }
+  .dash { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .dash > * { min-width: 0; }
+  .kpi { min-width: 0; overflow-wrap: anywhere; }
+  .fold { margin-top: 18px; }
+  .fold > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 6px 2px; user-select: none; }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary h2 { margin: 0; font-size: 1.05rem; }
+  .fold > summary::before { content: "▾"; order: 2; margin-inline-start: auto; transition: transform .15s; }
+  .fold:not([open]) > summary::before { transform: rotate(-90deg); }
+  .fold > summary:focus-visible { outline: 2px solid var(--accent, #2e7d32); border-radius: 6px; }
+  .fold > summary .hint { order: 1; }
+  .dash-side .row { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(127,127,127,.2); }
+  @media (min-width: 900px) { .dash { grid-template-columns: minmax(0, 1fr) 260px; align-items: start; } .dash-side { position: sticky; top: 12px; } }
+  /* account rows: the action buttons wrap below the name instead of covering it */
+  #accList .set-row { flex-wrap: wrap; row-gap: 8px; }
+  #accList .set-row .txt { flex: 1 1 160px; min-width: 0; }
+  #accList .set-row > .btn { flex: 0 0 auto; }
+</style>
 </head>
 <body>
   <div class="app">
     <header class="top">
       <div class="bar">
         <h1>סיכומי וואטסאפ</h1>
-        <select id="accSel" class="acc-select" aria-label="חשבון" hidden></select>
+        <select id="accSel" class="acc-select" aria-label="בחירת חשבון וואטסאפ" hidden></select>
       </div>
       <nav class="tabs" role="tablist" aria-label="ניווט">
         <button class="tab" role="tab" data-tab="home" aria-selected="true"><span class="pill"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/></svg></span><span>בית</span></button>
         <button class="tab" role="tab" data-tab="collections" aria-selected="false"><span class="pill"><svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12.5 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg></span><span>אוספים</span></button>
-        <button class="tab" role="tab" data-tab="groups" aria-selected="false"><span class="pill"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.3c1.8.8 3 2.6 3 4.7"/></svg></span><span>קבוצות</span></button>
         <button class="tab" role="tab" data-tab="settings" aria-selected="false"><span class="pill"><svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span><span>הגדרות</span><i class="dot" id="settingsDot" hidden></i></button>
       </nav>
     </header>
@@ -300,60 +318,54 @@
       <!-- HOME -->
       <section class="view" id="view-home">
         <div id="statusArea"><div class="status"><div class="sub">טוען…</div></div></div>
+        <div class="dash">
+          <div class="dash-main">
+            <div id="dashKpi" class="kpis"></div>
 
-        <div class="sec">
-          <div class="sec-head"><h2>היום</h2></div>
-          <div class="card list" id="todayList"></div>
-        </div>
+            <details class="fold" data-key="today" open>
+              <summary><h2>היום</h2><span class="hint" id="dashHint"></span></summary>
+              <div class="card list" id="todayList"></div>
+            </details>
 
-        <div class="sec">
-          <div class="sec-head"><h2>הסיכום האחרון</h2></div>
-          <div class="card" id="lastSummary"></div>
-        </div>
+            <details class="fold" data-key="last" open>
+              <summary><h2>הסיכום האחרון</h2></summary>
+              <div class="card" id="lastSummary"></div>
+            </details>
 
-        <div class="sec">
-          <div class="sec-head"><h2>היסטוריה</h2></div>
-          <div class="card list" id="historyList"></div>
-          <div style="text-align:center;margin-top:8px"><button class="link" id="moreHistory" data-act="moreHistory" hidden>הצג עוד</button></div>
+            <details class="fold" data-key="top" open>
+              <summary><h2>הקבוצות הפעילות ביותר</h2></summary>
+              <div class="card" style="padding:12px" id="dashTop"></div>
+            </details>
+
+            <details class="fold" data-key="charts">
+              <summary><h2>מגמות ב-14 הימים האחרונים</h2></summary>
+              <div class="card" style="padding:12px" id="dashChart"></div>
+            </details>
+
+            <details class="fold" data-key="history">
+              <summary><h2>היסטוריה</h2></summary>
+              <div class="card list" id="historyList"></div>
+              <div style="text-align:center;margin-top:8px"><button class="link" id="moreHistory" data-act="moreHistory" hidden>הצגת סיכומים נוספים</button></div>
+            </details>
+          </div>
+          <aside class="dash-side" id="devStrip"></aside>
         </div>
       </section>
 
       <!-- COLLECTIONS -->
       <section class="view" id="view-collections" hidden>
-        <div class="sec-head"><div><h2>אוספי קבוצות</h2><div class="hint">כל אוסף שולח סיכום משלו, בשעה שלו, רק מהקבוצות שבו. הסיכום האוטומטי מסכם את היום הקודם.</div></div></div>
+        <div class="sec-head"><div><h2>אוספי קבוצות</h2><div class="hint">כל אוסף, כולל "כללי", שולח סיכום משלו בשעה שלו. כל קבוצה נמצאת באוסף אחד בלבד. קבוצה מחוץ לאוספים לא במעקב. אפשר גם ליצור אוסף של אנשי קשר, לסיכום השיחות הפרטיות.</div></div></div>
         <div id="colList"></div>
 
-        <div class="sec">
-          <div class="sec-head"><h2>הסיכום הראשי</h2></div>
-          <div class="card fill col">
-            <div class="col-top"><div class="nm">שאר הקבוצות במעקב</div><input type="time" id="mainTime" class="field" style="width:auto" aria-label="שעת הסיכום הראשי"></div>
-            <div class="groups" id="mainInfo"></div>
-          </div>
-        </div>
       </section>
 
-      <!-- GROUPS -->
-      <section class="view" id="view-groups" hidden>
-        <div class="sec-head"><div><h2>קבוצות</h2><div class="hint" id="groupsHint"></div></div></div>
-        <input type="search" id="gSearch" class="field" placeholder="חיפוש קבוצה" autocomplete="off" aria-label="חיפוש קבוצה">
-        <div class="seg" role="group" aria-label="סינון">
-          <button data-filter="monitored" aria-pressed="true">במעקב</button>
-          <button data-filter="loose" aria-pressed="false">במעקב, בלי אוסף</button>
-          <button data-filter="recent" aria-pressed="false">פעילות לאחרונה</button>
-          <button data-filter="all" aria-pressed="false">הכול</button>
-        </div>
-        <div class="card list" id="gList"></div>
-        <div style="text-align:center;margin-top:8px"><button class="link" id="gMore" data-act="moreGroups" hidden>הצג עוד</button></div>
-      </section>
-
-      <!-- SETTINGS -->
       <section class="view" id="view-settings" hidden>
         <div class="sg">
           <div class="sg-h">חיבור לוואטסאפ</div>
           <div class="card set">
             <div id="accList"></div>
-            <div class="set-row"><span class="ri"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><div class="txt"><div class="lbl">התחברות מחדש</div><div class="d" id="waD"></div></div><button class="btn small" data-act="relink">חיבור מחדש</button></div>
-            <div class="set-row"><span class="ri"><svg viewBox="0 0 24 24"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8.5"/></svg></span><div class="txt"><div class="lbl">ייבוא היסטוריה</div><div class="d">קישור מחדש של הטלפון, כדי לקבל הודעות מאתמול והיום</div></div><button class="btn small" data-act="relinkHistory">ייבוא</button></div>
+            <div class="set-row"><span class="ri"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span><div class="txt"><div class="lbl">חידוש החיבור</div><div class="d" id="waD"></div></div><button class="btn small" data-act="relink">חידוש חיבור</button></div>
+            <div class="set-row"><span class="ri"><svg viewBox="0 0 24 24"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="8.5"/></svg></span><div class="txt"><div class="lbl">ייבוא היסטוריה</div><div class="d">קישור מחדש של הטלפון, כדי לקבל הודעות מאתמול ומהיום</div></div><button class="btn small" data-act="relinkHistory">ייבוא</button></div>
           </div>
           <button class="btn block tonal mgr" style="margin-top:10px" data-act="addAcc">+ הוספת חשבון</button>
         </div>
@@ -361,15 +373,15 @@
         <div class="sg">
           <div class="sg-h">שליחת הסיכומים</div>
           <div class="card set">
-            <div class="set-row"><span class="ri"><svg viewBox="0 0 24 24"><path d="M21 4 3 11l7 3 3 7 8-17Z"/></svg></span><div class="txt"><div class="lbl">לצ'אט שלי</div><div class="d">"שלח הודעה לעצמך"</div></div><button class="sw-hit" data-act="tgSelf" aria-label="שליחה לצ'אט שלי"><span class="sw" id="swSelf" role="switch" aria-checked="false"></span></button></div>
-            <div class="set-row"><span class="ri"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg></span><div class="txt"><div class="lbl">גם למספר נוסף</div><div class="d" id="extraD">כבוי</div></div><button class="sw-hit" data-act="tgExtra" aria-label="שליחה גם למספר נוסף"><span class="sw" id="swExtra" role="switch" aria-checked="false"></span></button></div>
+            <div class="set-row"><span class="ri"><svg viewBox="0 0 24 24"><path d="M21 4 3 11l7 3 3 7 8-17Z"/></svg></span><div class="txt"><div class="lbl">שליחה לחשבון שלי</div><div class="d">בשיחה האישית שלי בוואטסאפ</div></div><button class="sw-hit" data-act="tgSelf" aria-label="שליחה לחשבון שלי"><span class="sw" id="swSelf" role="switch" aria-checked="false"></span></button></div>
+            <div class="set-row"><span class="ri"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg></span><div class="txt"><div class="lbl">גם למספר נוסף</div><div class="d" id="extraD">לא מופעל</div></div><button class="sw-hit" data-act="tgExtra" aria-label="שליחה גם למספר נוסף"><span class="sw" id="swExtra" role="switch" aria-checked="false"></span></button></div>
             <div class="set-row" id="extraRow" hidden><input type="tel" id="extraPhone" class="field" placeholder="למשל 052-1234567" inputmode="tel" aria-label="מספר נוסף"></div>
           </div>
         </div>
 
         <div class="sg">
           <div class="sg-h">מענה אוטומטי</div>
-          <div class="sg-d">הודעה קבועה שנשלחת לאנשים שבחרתם כשהם כותבים לכם בשעות שהגדרתם. מענה אחד לאדם בכל פעם, ורק בצ'אטים פרטיים.</div>
+          <div class="sg-d">הודעה קבועה הנשלחת לנמענים נבחרים הפונים אליכם בשעות שהוגדרו. מענה יחיד לכל איש קשר בפרק הזמן שנקבע, בשיחות פרטיות בלבד.</div>
           <div class="card set" id="arList"></div>
           <button class="btn block tonal" style="margin-top:10px" data-act="newAr">+ כלל מענה חדש</button>
         </div>
@@ -378,22 +390,22 @@
           <div class="sg-h">בינה מלאכותית</div>
           <div class="card set">
             <div class="set-row" style="align-items:flex-start;flex-direction:column;gap:8px;padding:14px 0"><div class="lbl">הנחיה כללית</div><textarea id="prompt" class="field" rows="7" aria-label="הנחיה ל-AI" style="background:var(--bg)"></textarea>
-              <div style="display:flex;gap:10px;align-items:center;width:100%"><button class="btn small primary" data-act="savePrompt">שמירה</button><span class="hint">קובעת מה נחשב חשוב ואיך הסיכום נראה.</span></div></div>
+              <div style="display:flex;gap:10px;align-items:center;width:100%"><button class="btn small primary" data-act="savePrompt">שמירה</button><span class="hint">ההנחיה מגדירה אילו נושאים ייחשבו לעיקריים וכיצד ינוסח הסיכום.</span></div></div>
             <div class="set-row mgr"><span class="ri"><svg viewBox="0 0 24 24"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/></svg></span><div class="txt"><div class="lbl">מודל Gemini</div><div class="d" id="modelD">טוען רשימה…</div></div></div>
             <div class="set-row mgr"><select id="modelSel" class="field" aria-label="מודל Gemini" style="background:var(--bg)"><option value="">אוטומטי (מומלץ)</option></select></div>
             <div class="set-row mgr" style="flex-wrap:wrap"><button class="btn small" data-act="testModel">בדיקת המודל</button><button class="btn small" data-act="refreshModels">רענון הרשימה</button><span class="hint" id="modelRes" style="flex-basis:100%"></span></div>
           </div>
-          <p class="hint mgr" style="margin:8px 4px 0">הרשימה נשלפת מ-Google AI Studio לפי המפתח שלך. אם המודל עמוס, המערכת עוברת אוטומטית למודל גיבוי.</p>
+          <p class="hint mgr" style="margin:8px 4px 0">הרשימה נטענת מ-Google AI Studio בהתאם למפתח שהוגדר. בעת עומס על המודל הנבחר, המערכת תעבור אוטומטית למודל גיבוי.</p>
         </div>
 
         <div class="sg">
           <div class="sg-h">אבטחה ומערכת</div>
           <div class="card set">
-            <div class="set-row"><span class="ri"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg></span><div class="txt"><div class="lbl">סיסמה לדשבורד</div><div class="d" id="pwD"></div></div><button class="btn small" data-act="editPassword">הגדרה</button></div>
-            <div class="set-row" id="logoutRow" hidden><span class="ri"><svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/></svg></span><div class="txt"><div class="lbl">יציאה</div><div class="d" id="meD"></div></div><button class="btn small" data-act="logout">יציאה</button></div>
+            <div class="set-row"><span class="ri"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg></span><div class="txt"><div class="lbl">סיסמה ללוח הבקרה</div><div class="d" id="pwD"></div></div><button class="btn small" data-act="editPassword">הגדרה</button></div>
+            <div class="set-row" id="logoutRow" hidden><span class="ri"><svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/></svg></span><div class="txt"><div class="lbl">חשבון נוכחי</div><div class="d" id="meD"></div></div><button class="btn small" data-act="logout">התנתקות</button></div>
             <div class="set-row mgr"><span class="ri"><svg viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15L6 17Z"/><path d="M10 21h4"/></svg></span><div class="txt"><div class="lbl">התראות לטלפון</div><div class="d" id="alertD"></div></div><button class="btn small" data-act="editAlerts">הגדרה</button></div>
             <div class="set-row mgr"><span class="ri"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M16 7l3 3"/></svg></span><div class="txt"><div class="lbl">מפתח Gemini</div><div class="d" id="gemD"></div></div><button class="btn small" data-act="editKey">שינוי</button></div>
-            <div class="set-row mgr"><span class="ri"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg></span><div class="txt"><div class="lbl">יומן תקלות</div><div class="d">ניתוקים, שליחות שנכשלו והפעלות של השרת</div></div><button class="btn small" data-act="showErrors">הצגה</button></div>
+            <div class="set-row mgr"><span class="ri"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg></span><div class="txt"><div class="lbl">יומן תקלות</div><div class="d">ניתוקים, כשלי שליחה והפעלות של השרת</div></div><button class="btn small" data-act="showErrors">הצגה</button></div>
           </div>
           <div class="sys" id="sys"></div>
         </div>
@@ -401,14 +413,14 @@
     </main>
   </div>
 
-  <button class="fab" id="fab" aria-label="סכם עכשיו"></button>
+  <button class="fab" id="fab" aria-label="סיכום עכשיו"></button>
   <div id="sheet" hidden><div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></div></div>
   <div id="toast" aria-live="polite"></div>
   <div id="login" hidden>
     <form class="login-box" id="loginForm" autocomplete="on">
       <div class="login-ic"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg></div>
       <h1>סיכומי וואטסאפ</h1>
-      <p class="hint">הקלידו את הסיסמה של החשבון שלכם</p>
+      <p class="hint">הקלידו את סיסמת החשבון</p>
       <input type="text" name="username" autocomplete="username" value="dashboard" hidden>
       <input id="loginPw" type="password" class="field" autocomplete="current-password" placeholder="סיסמה" aria-label="סיסמה" required>
       <button class="btn primary block" type="submit" id="loginBtn">כניסה</button>
@@ -437,17 +449,17 @@
   const avatar = name => `<div class="av" style="--h:${hue(name)}">${ICON.people}</div>`;
   const stateLine = (st, mins) => ({
     sent: { cls: '', pre: ICON.tick, txt: 'נשלח' },
-    skipped: { cls: '', pre: '', txt: 'אין משהו חשוב/דחוף' },
-    empty: { cls: '', pre: '', txt: 'אין משהו חשוב/דחוף' },
+    skipped: { cls: '', pre: '', txt: 'לא אותרו עדכונים דחופים או חשובים' },
+    empty: { cls: '', pre: '', txt: 'לא אותרו עדכונים דחופים או חשובים' },
     failed: { cls: 'bad', pre: '', txt: 'נכשל' },
     running: { cls: '', pre: '', txt: 'בתהליך…', g: true },
-    queued: { cls: 'warn', pre: '', txt: 'ממתין לשליחה (יישלח כשהחיבור יחזור)' },
-    missed: { cls: 'warn', pre: '', txt: 'לא הורץ' },
+    queued: { cls: 'warn', pre: '', txt: 'ממתין לחידוש החיבור' },
+    missed: { cls: 'warn', pre: '', txt: 'לא בוצע' },
     upcoming: { cls: '', pre: '', txt: inText(mins || 0), g: true }
   }[st] || { cls: '', pre: '', txt: st });
 
   let state = null, cur = null, view = (location.hash || '').slice(1) || store('view') || 'home';
-  let lastJson = '', busy = false, histLimit = 6, groupLimit = 60, gFilter = 'monitored', gQuery = '';
+  let lastJson = '', busy = false, histLimit = 6;
   let timer = null, editor = null, sheetResolve = null, qrSrc = '';
 
   /* ---------- helpers ---------- */
@@ -478,7 +490,7 @@
     if (mins < 60) return `בעוד ${mins} דקות`;
     const h = Math.floor(mins / 60), m = mins % 60;
     const hh = h === 1 ? 'שעה' : `${h} שעות`;
-    return m ? `בעוד ${hh} ו-${m} דק'` : `בעוד ${hh}`;
+    return m ? `בעוד ${hh} ו-${m} דקות` : `בעוד ${hh}`;
   };
   const minsOf = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 
@@ -515,7 +527,7 @@
     let data = {};
     try { data = await res.json(); } catch (e) {}
     if (res.status === 401 && data.auth) { showLogin(); return { ok: false, error: data.error }; }
-    if (!res.ok && !data.error) data.error = 'שגיאה ' + res.status;
+    if (!res.ok && !data.error) data.error = 'השרת נתקל בבעיה (קוד ' + res.status + '). נא לנסות שוב בעוד מספר דקות.';
     return data;
   }
 
@@ -544,7 +556,7 @@
     const el = $('#staleBar'); if (!el) return;
     const old = lastOk && Date.now() - lastOk > 90000;
     el.hidden = !(old || !lastOk && state);
-    if (!el.hidden) el.textContent = lastOk ? `השרת לא מגיב. המידע במסך מעודכן ל-${hhmm(lastOk)}.` : 'מציג מידע שמור. מתחבר לשרת…';
+    if (!el.hidden) el.textContent = lastOk ? `השרת אינו מגיב. המידע במסך עודכן לאחרונה ב- ל-${hhmm(lastOk)}.` : 'מוצג מידע שנשמר במכשיר. מתחבר מחדש לשרת…';
   }
   setInterval(renderStale, 15000);
   function schedule() {
@@ -558,15 +570,6 @@
 
   /* ---------- derived ---------- */
   function collections(a) { return Object.values(a.collections || {}); }
-  function timedJids(a) {
-    const s = new Set();
-    collections(a).forEach(c => { if (c.enabled !== false && c.time) (c.jids || []).forEach(j => s.add(j)); });
-    return s;
-  }
-  function mainJids(a) {
-    const t = timedJids(a);
-    return Object.entries(a.monitoredGroups || {}).filter(([j, g]) => g.enabled && !g.customTime && !t.has(j)).map(([j]) => j);
-  }
   // match by collection id (survives renames), fall back to the label for older entries
   function lastFor(a, label, colId) { return (a.history || []).find(h => (colId && h.collectionId === colId) || h.label === label); }
 
@@ -575,10 +578,8 @@
     const today = (a.history || []).filter(h => h.ts >= start);
     const items = [];
     collections(a).forEach(c => {
-      if (c.enabled !== false && c.time) items.push({ time: c.time, label: `אוסף: ${c.name}`, colId: c.id, name: c.name, groups: (c.jids || []).length });
+      if (c.enabled !== false && c.time) items.push({ time: c.time, label: `אוסף: ${c.name}`, colId: c.id, name: c.name, groups: (c.jids || []).length, kind: c.kind || 'groups' });
     });
-    const mj = mainJids(a);
-    if (mj.length && a.summaryTime) items.push({ time: a.summaryTime, label: 'סיכום ראשי', name: 'סיכום ראשי', groups: mj.length });
     items.sort((x, y) => minsOf(x.time) - minsOf(y.time));
     const now = new Date(); const nowM = now.getHours() * 60 + now.getMinutes();
     items.forEach(it => {
@@ -606,25 +607,25 @@
     if (a.status !== 'connected') {
       const linked = a.registered !== false;
       if (a.hasQr) {
-        alerts.push(`<div class="alert ${linked ? 'bad' : 'warn'}"><b>${ICON.alert} ${linked ? 'וואטסאפ מנותק' : 'חיבור הוואטסאפ של ' + esc(a.name)}</b><p>בטלפון: וואטסאפ ← מכשירים מקושרים ← קישור מכשיר, וסריקת הקוד. הקוד מתרענן לבד. אם לא תסרקו, החיבור יושהה אחרי כמה דקות ותוכלו להפעיל אותו שוב.</p>${qrSrc ? `<img class="qr" src="${esc(qrSrc)}" alt="קוד QR לחיבור">` : ''}</div>`);
+        alerts.push(`<div class="alert ${linked ? 'bad' : 'warn'}"><b>${ICON.alert} ${linked ? 'וואטסאפ מנותק' : 'חיבור הוואטסאפ של ' + esc(a.name)}</b><p>במכשיר הטלפון: היכנסו לוואטסאפ ← מכשירים מקושרים ← קישור מכשיר, וסרקו את הקוד המוצג. קוד ה-QR מתעדכן אוטומטית. אם לא יבוצע חיבור בתוך מספר דקות, התהליך יושהה ותוכלו להפעילו מחדש בכל עת.</p>${qrSrc ? `<img class="qr" src="${esc(qrSrc)}" alt="קוד QR לחיבור">` : ''}</div>`);
       } else if (a.status === 'paused') {
-        alerts.push(`<div class="alert ${linked ? 'bad' : 'warn'}"><b>${ICON.alert} ${linked ? 'החיבור לוואטסאפ מושהה' : 'החשבון של ' + esc(a.name) + ' עדיין לא מחובר'}</b><p>${linked ? 'כדי לחזור לקבל סיכומים צריך לחבר מחדש.' : 'כדי לקבל סיכומים צריך לקשר את הוואטסאפ. עד אז הוא לא צורך משאבים.'}</p><div class="acts"><button class="btn small primary" data-act="showQr">הצג קוד QR</button></div></div>`);
+        alerts.push(`<div class="alert ${linked ? 'bad' : 'warn'}"><b>${ICON.alert} ${linked ? 'החיבור לוואטסאפ מושהה' : 'החשבון של ' + esc(a.name) + ' עדיין לא מחובר'}</b><p>${linked ? 'כדי לחדש את קבלת הסיכומים, יש לחבר את החשבון מחדש.' : 'כדי להתחיל בקבלת הסיכומים, יש לקשר את חשבון הוואטסאפ לסריקה.'}</p><div class="acts"><button class="btn small primary" data-act="showQr">הצגת קוד QR</button></div></div>`);
       } else {
-        alerts.push(`<div class="alert warn"><b>${ICON.alert} מתחבר מחדש לוואטסאפ…</b><p>בדרך כלל זה נגמר תוך דקה.</p></div>`);
+        alerts.push(`<div class="alert warn"><b>${ICON.alert} מתחבר מחדש לוואטסאפ…</b><p>חידוש החיבור אורך בדרך כלל כדקה אחת.</p></div>`);
       }
     }
     const hl = a.health || {};
     if (a.status === 'connected' && hl.drops30 >= 4) {
-      alerts.push(`<div class="alert warn"><b>${ICON.alert} החיבור לוואטסאפ לא יציב</b><p>נפל וחזר ${hl.drops30} פעמים בחצי השעה האחרונה. הודעות עלולות להיקלט באיחור.</p></div>`);
+      alerts.push(`<div class="alert warn"><b>${ICON.alert} החיבור לוואטסאפ לא יציב</b><p>החיבור התנתק וחודש ${hl.drops30} פעמים בחצי השעה האחרונה. ייתכן עיכוב בקליטת הודעות חדשות.</p></div>`);
     }
     if (state.health && state.health.lagMs > 10000) {
-      alerts.push(`<div class="alert warn"><b>${ICON.alert} השרת עמוס כרגע</b><p>פעולות בדשבורד עלולות להיות איטיות (עיכוב של עד ${Math.round(state.health.lagMs / 1000)} שניות).</p></div>`);
+      alerts.push(`<div class="alert warn"><b>${ICON.alert} השרת עמוס כרגע</b><p>פעולות בלוח הבקרה עלולות להיות איטיות (עיכוב של עד ${Math.round(state.health.lagMs / 1000)} שניות).</p></div>`);
     }
     if (state.me && state.me.authEnabled === false) {
-      alerts.push(`<div class="alert warn"><b>${ICON.alert} הדשבורד פתוח בלי סיסמה</b><p>כל מי שנמצא ברשת יכול לקרוא את הסיכומים ולשלוח הודעות מהחשבון שלכם. מומלץ להגדיר סיסמה.</p><div class="acts"><button class="btn small primary" data-act="editPassword">הגדרת סיסמה</button></div></div>`);
+      alerts.push(`<div class="alert warn"><b>${ICON.alert} לוח הבקרה אינו מוגן בסיסמה</b><p>כל מי שנמצא ברשת המקומית יכול לצפות בסיכומים ולשנות הגדרות. מומלץ להגדיר סיסמה.</p><div class="acts"><button class="btn small primary" data-act="editPassword">הגדרת סיסמה</button></div></div>`);
     }
     if (!state.hasGeminiKey) {
-      alerts.push(`<div class="alert bad"><b>${ICON.alert} חסר מפתח Gemini</b><p>בלעדיו אי אפשר להפיק סיכומים.</p><div class="acts"><button class="btn small primary" data-act="editKey">הגדרת מפתח</button></div></div>`);
+      alerts.push(`<div class="alert bad"><b>${ICON.alert} נדרש מפתח Gemini</b><p>ללא הזנת מפתח Gemini לא ניתן להפיק סיכומים.</p><div class="acts"><button class="btn small primary" data-act="editKey">הגדרת מפתח</button></div></div>`);
     }
     const items = todayItems(a);
     // latest failure not followed by a success for the same label
@@ -634,25 +635,25 @@
       if (seen.has(k)) return;
       seen.add(k);
       if (h.status === 'failed' && h.ts >= dayStart() - 86400000) {
-        alerts.push(`<div class="alert bad"><b>${ICON.alert} הסיכום "${esc(h.label.replace(/^אוסף: /, ''))}" לא נשלח</b><p>${esc(whenLabel(h.ts))} · ${esc(h.error || 'שגיאה לא ידועה')}</p><div class="acts"><button class="btn small primary" data-act="retry" data-label="${esc(h.label)}" data-id="${esc(h.collectionId || '')}">נסו שוב עכשיו</button></div></div>`);
+        alerts.push(`<div class="alert bad"><b>${ICON.alert} הסיכום "${esc(h.label.replace(/^אוסף: /, ''))}" לא נשלח</b><p>${esc(whenLabel(h.ts))} · ${esc(h.error || 'סיבה לא ידועה')}</p><div class="acts"><button class="btn small primary" data-act="retry" data-label="${esc(h.label)}" data-id="${esc(h.collectionId || '')}">ניסיון חוזר</button></div></div>`);
       }
     });
 
     const ok = a.status === 'connected' && state.hasGeminiKey;
     const nx = nextSend(items);
-    let sub = nx ? `הסיכום הבא: ${nx.day} ב-${num(nx.it.time)} (${esc(nx.it.name)})` : 'אין שליחות מתוזמנות. הוסיפו אוסף או הגדירו שעה לסיכום הראשי.';
+    let sub = nx ? `הסיכום הבא: ${nx.day} ב-${num(nx.it.time)} (${esc(nx.it.name)})` : 'אין סיכומים מתוזמנים. באפשרותכם להוסיף אוסף חדש או לקבוע שעת שליחה לאוסף הכללי.';
     const who = a.user && a.user.id ? phone(a.user.id) : '';
     const okBlock = ok ? `<div class="status"><div class="ic">${ICON.check}</div><div><b>הכול תקין</b><div class="sub">מחובר לוואטסאפ${who ? ' · ' + num(who) : ''}</div><div class="sub">${sub}</div></div></div>` : (nx ? `<div class="status"><div><div class="sub">${sub}</div></div></div>` : '');
-    if (state.running) alerts.unshift(`<div class="alert warn"><b>${ICON.alert} מסכם כעת: ${esc(state.running.label.replace(/^אוסף: /, ''))}…</b><p>סיכום נוסף לא יתחיל עד שזה יסתיים.</p></div>`);
+    if (state.running) alerts.unshift(`<div class="alert warn"><b>${ICON.alert} מסכם כעת: ${esc(state.running.label.replace(/^אוסף: /, ''))}…</b><p>לא ניתן להפעיל סיכום נוסף במקביל עד לסיום הפקת הסיכום הנוכחי.</p></div>`);
     $('#statusArea').innerHTML = (alerts.length ? `<div class="alerts">${alerts.join('')}</div>` : '') + okBlock;
 
     // today
     $('#todayList').innerHTML = items.length ? items.map(it => {
       const s = stateLine(it.state, it.mins);
       return `<div class="chat">${avatar(it.name)}<div class="grow"><div class="t1"><span class="nm1">${esc(it.name)}</span><span class="tm ${s.g ? 'g' : ''}">${num(it.time)}</span></div>
-        <div class="pv ${s.cls}">${s.pre}<span>${esc(s.txt)} · ${it.groups} קבוצות</span></div></div></div>`;
+        <div class="pv ${s.cls}">${s.pre}<span>${esc(s.txt)} · ${countLabel(it.groups, it.kind === 'people')}</span></div></div></div>`;
     }).join('')
-      : '<div class="empty">אין שליחות מתוזמנות להיום</div>';
+      : '<div class="empty">אין סיכומים מתוזמנים להיום</div>';
 
     // last summary
     const hist = a.history || [];
@@ -662,7 +663,7 @@
       const long = lastSent.text.length > 520;
       box.innerHTML = `<div class="sum-meta"><div><span class="t">${esc(lastSent.label.replace(/^אוסף: /, ''))}</span> <span class="muted">· ${esc(whenLabel(lastSent.ts))}</span></div></div>
         <div class="sum-body ${long ? 'clamped' : ''}" id="lastBody">${fmt(lastSent.text)}</div>
-        <div class="sum-foot">${long ? '<button class="btn small" data-act="expandLast">הצג הכול</button>' : ''}<button class="btn small" data-act="copyLast">העתקה</button></div>`;
+        <div class="sum-foot">${long ? '<button class="btn small" data-act="expandLast">הצגת הסיכום המלא</button>' : ''}<button class="btn small" data-act="copyLast">העתקה</button></div>`;
       box.dataset.text = lastSent.text;
     } else if (a.lastSummaryText) {
       box.innerHTML = `<div class="sum-body">${fmt(a.lastSummaryText)}</div>`;
@@ -678,7 +679,7 @@
       const s = stateLine(h.status);
       const nm = h.label.replace(/^אוסף: /, '');
       const detail = h.status === 'sent' && h.text ? `<div class="sum-body">${fmt(h.text)}</div>`
-        : `<div class="sum-body muted">${h.status === 'failed' ? esc(h.error || '') : h.status === 'skipped' ? `נבדקו ${h.messages || 0} הודעות ב-${h.groups || 0} קבוצות ולא נמצא בהן משהו חשוב או דחוף.` : 'לא היו הודעות חדשות בקבוצות האלה, ולכן אין משהו חשוב או דחוף.'}</div>`;
+        : `<div class="sum-body muted">${h.status === 'failed' ? esc(h.error || '') : h.status === 'skipped' ? `נבדקו ${h.messages || 0} הודעות ב-${h.groups || 0} קבוצות ולא אותרו עדכונים מהותיים או דחופים.` : 'לא התקבלו הודעות חדשות בקבוצות אלו, ולכן לא הופק סיכום.'}</div>`;
       return `<details class="h"><summary class="chat">${avatar(nm)}<div class="grow"><div class="t1"><span class="nm1">${esc(nm)}</span><span class="tm">${esc(whenLabel(h.ts))}</span></div>
         <div class="pv ${s.cls}">${s.pre}<span>${esc(s.txt)}${h.messages ? ` · ${h.messages} הודעות` : ''}</span></div></div></summary>${detail}</details>`;
     }).join('') : '<div class="empty">עדיין אין היסטוריה</div>';
@@ -689,50 +690,22 @@
 
   /* ---------- render: collections ---------- */
   function renderCollections(a) {
-    const cols = collections(a);
+    const cols = collections(a).sort((x, y) => (x.id === 'general' ? -1 : 0) - (y.id === 'general' ? -1 : 0));
     const groups = a.monitoredGroups || {};
     $('#colList').innerHTML = cols.length ? cols.map(c => {
-      const names = (c.jids || []).map(j => groups[j] && groups[j].name).filter(Boolean);
+      const isP = c.kind === 'people';
+      const names = isP ? (c.jids || []).map(j => (c.names || {})[j] || ('+' + j.split('@')[0])) : (c.jids || []).map(j => groups[j] && groups[j].name).filter(Boolean);
       const prev = names.slice(0, 3).map(esc).join(' · ') + (names.length > 3 ? ` ועוד ${names.length - 3}` : '');
       const last = lastFor(a, `אוסף: ${c.name}`, c.id);
       const ls = last ? stateLine(last.status) : null;
       return `<div class="chat ${c.enabled === false ? 'off' : ''}" style="${c.enabled === false ? 'opacity:.55' : ''}">${avatar(c.name)}
         <button class="grow g-main" data-act="editCol" data-id="${esc(c.id)}" aria-label="עריכת ${esc(c.name)}"><div class="t1"><span class="nm1">${esc(c.name)}</span><span class="tm g">${c.time ? num(c.time) : 'ידני'}</span></div>
-          <div class="pv">${esc(names.length)} קבוצות${prev ? ' · ' + prev : ''}</div>
+          <div class="pv">${esc(countLabel(names.length, isP))}${prev ? ' · ' + prev : ''}</div>
           ${ls ? `<div class="pv ${ls.cls}">${ls.pre}<span>${esc(ls.txt)} · ${esc(whenLabel(last.ts))}</span></div>` : ''}</button>
         <button class="sw-hit" data-act="tgCol" data-id="${esc(c.id)}" aria-label="הפעלה או השהיה של ${esc(c.name)}"><span class="sw" role="switch" aria-checked="${c.enabled !== false}"></span></button></div>
-        <div class="chat-sub"><button class="link" data-act="runCol" data-id="${esc(c.id)}">סכם עכשיו</button></div>`;
-    }).join('') : '<div class="empty">עדיין אין אוספים. אוסף מאפשר לקבל סיכום נפרד לנושא, למשל "עבודה" או "משפחה".</div>';
+        <div class="chat-sub"><button class="link" data-act="runCol" data-id="${esc(c.id)}">סיכום עכשיו</button></div>`;
+    }).join('') : '<div class="empty">עדיין לא נוצרו אוספים. אוסף מאפשר לקבל סיכום נפרד לפי נושא, למשל "צוות הנהלה", "מחנכים" או "קבוצות הורים".</div>';
 
-    const n = mainJids(a).length;
-    $('#mainInfo').textContent = n ? `${n} קבוצות שלא שייכות לאוסף עם שעה. הן מסוכמות יחד בשעה הזו.` : 'כל הקבוצות במעקב שייכות לאוספים.';
-    const mt = $('#mainTime');
-    if (document.activeElement !== mt && a.summaryTime) mt.value = a.summaryTime;
-  }
-
-  /* ---------- render: groups ---------- */
-  function renderGroups(a, resetLimit) {
-    if (resetLimit) groupLimit = 60;
-    const groups = a.monitoredGroups || {};
-    const all = Object.entries(groups).map(([jid, g]) => ({ jid, ...g }));
-    const mon = all.filter(g => g.enabled).length;
-    const memb = {};
-    collections(a).forEach(c => (c.jids || []).forEach(j => (memb[j] = memb[j] || []).push(c.name)));
-    const loose = all.filter(g => g.enabled && !memb[g.jid]).length;
-    $('#groupsHint').textContent = `${mon} במעקב מתוך ${all.length}` + (loose ? ` · ${loose} מהן בלי אוסף (נכנסות לסיכום הראשי)` : '') + '. קבוצות שלא במעקב לא נקראות, ומעקב חדש קולט הודעות מרגע ההפעלה.';
-    let rows = all;
-    const q = gQuery.trim().toLowerCase();
-    if (q) rows = rows.filter(g => g.name.toLowerCase().includes(q));
-    else if (gFilter === 'monitored') rows = rows.filter(g => g.enabled);
-    else if (gFilter === 'loose') rows = rows.filter(g => g.enabled && !memb[g.jid]);
-    rows.sort((x, y) => gFilter === 'all' && !q ? x.name.localeCompare(y.name, 'he') : (y.lastActivity || 0) - (x.lastActivity || 0));
-    const shown = rows.slice(0, groupLimit);
-    $('#gList').innerHTML = shown.length ? shown.map(g => `
-      <div class="chat">${avatar(g.name)}<button class="grow g-main" data-act="moveGroup" data-jid="${esc(g.jid)}" aria-label="העברת ${esc(g.name)} לאוסף"><div class="t1"><span class="nm1">${esc(g.name)}</span><span class="tm">${esc(ago(g.lastActivity))}</span></div>
-        <div class="labs">${memb[g.jid] ? memb[g.jid].map(n => `<span class="lab" style="--h:${hue(n)}">${esc(n)}</span>`).join('') : `<span class="lab none">${g.enabled ? 'בלי אוסף' : 'לא במעקב'}</span>`}</div></button>
-        <button class="sw-hit" data-act="tgGroup" data-jid="${esc(g.jid)}" aria-label="מעקב אחרי ${esc(g.name)}"><span class="sw" role="switch" aria-checked="${!!g.enabled}"></span></button></div>`).join('')
-      : `<div class="empty">${q ? 'לא נמצאו קבוצות' : gFilter === 'loose' ? 'כל הקבוצות במעקב שייכות לאוסף' : 'אין קבוצות במעקב'}</div>`;
-    $('#gMore').hidden = rows.length <= groupLimit;
   }
 
   /* ---------- render: settings ---------- */
@@ -749,8 +722,8 @@
     $('#arList').innerHTML = rules.length ? rules.map(r => `
       <div class="chat" style="${r.enabled === false ? 'opacity:.55' : ''}">${avatar(r.name)}
         <button class="grow g-main" data-act="editAr" data-id="${esc(r.id)}" aria-label="עריכת ${esc(r.name)}"><div class="t1"><span class="nm1">${esc(r.name)}</span><span class="tm g">${num(r.start)}–${num(r.end)}</span></div>
-          <div class="pv">${r.phones.length} ${r.phones.length === 1 ? 'אדם' : 'אנשים'} · ${esc(r.text)}</div>
-          ${r.replies ? `<div class="pv">נשלחו ${r.replies} מענים · האחרון ${esc(whenLabel(r.lastReply))}</div>` : ''}</button>
+          <div class="pv">${r.phones.length === 1 ? 'איש קשר אחד' : r.phones.length + ' אנשי קשר'} · ${esc(r.text)}</div>
+          ${r.replies ? `<div class="pv">נשלחו ${r.replies} הודעות מענה · האחרון ${esc(whenLabel(r.lastReply))}</div>` : ''}</button>
         <button class="sw-hit" data-act="tgAr" data-id="${esc(r.id)}" aria-label="הפעלה או השהיה של ${esc(r.name)}"><span class="sw" role="switch" aria-checked="${r.enabled !== false}"></span></button></div>`).join('')
       : '<div class="empty" style="padding:18px 0">עדיין אין כללים. לחצו על "כלל מענה חדש" כדי להתחיל.</div>';
     $('#waD').innerHTML = a.status === 'connected' ? `מחובר${who ? ' · ' + num(who) : ''}` : (a.status === 'paused' ? 'מושהה' : 'מנותק');
@@ -758,10 +731,10 @@
     const me = state.me || {};
     const mine = me.accountId || cur;
     $('#pwD').textContent = !me.authEnabled ? 'כבויה: כל מי שברשת יכול להיכנס. מומלץ להגדיר.'
-      : `מוגדרת${me.accountId ? ' לחשבון ' + (state.accounts[me.accountId] || {}).name : ''}${me.manager ? '. את סיסמאות שאר החשבונות קובעים ברשימת החשבונות למעלה' : ''}`;
+      : `מוגדרת${me.accountId ? ' לחשבון ' + (state.accounts[me.accountId] || {}).name : ''}${me.manager ? '. הגדרת סיסמאות לחשבונות נוספים מתבצעת ברשימת החשבונות שלמעלה' : ''}`;
     $('#logoutRow').hidden = !me.authEnabled;
     if (me.authEnabled) $('#meD').textContent = `מחובר כ${(state.accounts[mine] || {}).name || ''}${me.manager ? ' (מנהל)' : ''}`;
-    $('#alertD').textContent = state.alertTopic ? 'פעילות: התראה כשהחיבור נופל או סיכום נכשל' : 'כבויות. מומלץ להפעיל, כדי לדעת מיד כשמשהו נופל';
+    $('#alertD').textContent = state.alertTopic ? 'פעיל: שליחת התראה כשהחיבור מנותק 5 דקות ומעלה או כשל בהפקת סיכום' : 'כבוי. מומלץ להפעיל כדי לקבל התראה מיידית במקרה של תקלה או ניתוק.';
     const st = id => { const x = state.accounts[id]; return x.status === 'connected' ? '<span class="chip ok">מחובר</span>' : x.status === 'paused' ? '<span class="chip warn">' + (x.registered === false ? 'לא מחובר' : 'מושהה') + '</span>' : '<span class="chip">מתחבר…</span>'; };
     $('#accList').innerHTML = Object.keys(state.accounts).map(id => `
       <div class="set-row">${avatar(state.accounts[id].name)}<div class="txt"><div class="lbl">${esc(state.accounts[id].name)} ${id === cur ? '<span class="chip accent">פעיל כעת</span>' : ''}</div><div class="d">${st(id)}</div></div>
@@ -769,7 +742,7 @@
         <button class="btn small" data-act="renameAcc" data-id="${esc(id)}">שינוי שם</button>
         ${(state.me || {}).authEnabled && (state.me || {}).manager && id !== (state.me || {}).accountId ? `<button class="btn small" data-act="editPassword" data-id="${esc(id)}">${state.me.passwords && state.me.passwords[id] ? 'סיסמה' : 'קביעת סיסמה'}</button>` : ''}</div>`).join('');
     const s = state.system || {};
-    const ing = a.ingest && a.ingest.received ? ` · מאז ${new Date(a.ingest.since).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })} נקלטו ${a.ingest.saved} הודעות${a.ingest.undecryptable ? `, ${a.ingest.undecryptable} לא פוענחו` : ''}${a.ingest.noText ? `, ${a.ingest.noText} בלי טקסט (תמונות וכד')` : ''}` : '';
+    const ing = a.ingest && a.ingest.received ? ` · מאז ${new Date(a.ingest.since).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })} נקלטו ${a.ingest.saved} הודעות${a.ingest.undecryptable ? `, ${a.ingest.undecryptable} לא פוענחו` : ''}${a.ingest.noText ? `, ${a.ingest.noText} ללא טקסט (תמונות וקובצי מדיה)` : ''}` : '';
     $('#sys').textContent = s.hostname ? `${s.hostname} · זיכרון פנוי ${s.freeMemMb}MB · פעיל ${Math.round(s.uptimeHours / 24 * 10) / 10} ימים${ing}` : '';
   }
 
@@ -809,12 +782,97 @@
     if (a.hasQr && a.status !== 'connected') {
       fetch('/api/qr/' + cur).then(r => r.json()).then(d => { if (d.qr && d.qr !== qrSrc) { qrSrc = d.qr; if (!sheetOpen()) renderHome(acc()); } }).catch(() => {});
     }
-    renderHome(a); renderCollections(a); renderGroups(a); renderSettings(a);
+    renderHome(a); renderCollections(a); renderSettings(a);
     if (view === 'settings' && !modelsLoaded) loadModels();
   }
   const sheetOpen = () => !$('#sheet').hidden;
 
   /* ---------- tabs ---------- */
+  /* ---------- dashboard ---------- */
+  const SC = { ok: 'var(--ok, #2e7d32)', warn: 'var(--warn, #b26a00)', bad: 'var(--bad, #c62828)' };
+  const DEV_EVENT = { wifi_down: 'ניתוק Wi-Fi', wifi_up: 'חידוש חיבור רשת', under_voltage: 'מתח נמוך באספקה', temp_limit: 'הגבלת חום של המעבד', wa_down: 'ניתוק וואטסאפ', wa_up: 'חידוש חיבור וואטסאפ' };
+  // "bad" at or past the bad threshold, "warn" at or past the warn one (reversed when lower is worse)
+  function lvl(v, warn, bad, lowerIsWorse) {
+    if (v == null) return '';
+    if (lowerIsWorse) return v <= bad ? 'bad' : v <= warn ? 'warn' : 'ok';
+    return v >= bad ? 'bad' : v >= warn ? 'warn' : 'ok';
+  }
+  function kpi(label, value, sub) {
+    return `<div class="card kpi"><div class="hint">${esc(label)}</div><div class="kpi-v">${value}</div>${sub ? `<div class="hint">${sub}</div>` : ''}</div>`;
+  }
+  function bars(vals, days, color, label) {
+    const max = Math.max(1, ...vals);
+    const w = 300; const h = 70; const bw = w / Math.max(1, vals.length);
+    const rects = vals.map((v, i) => {
+      const bh = Math.round(v / max * (h - 6));
+      return `<rect x="${(i * bw + 2).toFixed(1)}" y="${h - bh}" width="${(bw - 4).toFixed(1)}" height="${bh}" rx="2" fill="${color}"><title>${esc(days[i])}: ${v}</title></rect>`;
+    }).join('');
+    return `<div class="hint">${esc(label)} (מקסימום ${max})</div><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:80px" role="img" aria-label="${esc(label)}">${rects}</svg>`;
+  }
+  const STAT_TXT = { sent: 'נשלח', queued: 'ממתין לשליחה', failed: 'נכשל', empty: 'ללא הודעות חדשות', skipped: 'ללא עדכונים דחופים' };
+  async function loadDashboard() {
+    const [d, dev] = await Promise.all([api('/api/dashboard'), api('/api/device')]);
+    if (d.error) { $('#dashKpi').innerHTML = `<div class="empty">${esc(d.error)}</div>`; return; }
+    renderDashboard(d);
+    if (!dev.error) renderDeviceStrip({ ...dev.now, events: dev.events });
+  }
+  function renderDashboard(d) {
+    const t = d.totals; const accs = Object.values(d.accounts);
+    const monitored = accs.reduce((a, x) => a + x.groupsMonitored, 0);
+    const inCols = accs.reduce((a, x) => a + x.groupsCollected, 0);
+    const colCount = accs.reduce((a, x) => a + x.collections.length, 0);
+    const dm = accs.reduce((a, x) => a + x.dm.in + x.dm.out, 0);
+    $('#dashHint').textContent = `${monitored} קבוצות במעקב · ${colCount} אוספים · ${accs.length} חשבונות`;
+    const failedKpi = t.failed.today > 0 ? ' style="border-color:var(--bad, #c62828)"' : '';
+    $('#dashKpi').innerHTML = [
+      kpi('סיכומים שנשלחו היום', t.sent.today, `השבוע: ${t.sent.week}`),
+      kpi('סיכומים שנכשלו היום', t.failed.today, `השבוע: ${t.failed.week}`),
+      kpi('הודעות שנאספו היום', t.collected.today, `השבוע: ${t.collected.week}`),
+      kpi('קבוצות במעקב', monitored, `${inCols} מהן באוספים`),
+      kpi('הודעות פרטיות היום', dm, 'נכנסות ויוצאות'),
+    ].join('');
+    $('#dashChart').innerHTML = bars(d.series.sent, d.days, 'var(--accent, #2e7d32)', 'סיכומים שנשלחו ליום')
+      + '<div style="height:12px"></div>' + bars(d.series.collected, d.days, 'var(--muted, #888)', 'הודעות שנאספו ליום');
+    const tops = accs.flatMap(x => x.top.map(g => `<div class="pv">${esc(x.name)} · ${esc(g.name)} · ${g.n} הודעות</div>`));
+    $('#dashTop').innerHTML = tops.length ? tops.join('') : '<div class="empty">אין הודעות ב-24 השעות האחרונות</div>';
+  }
+  function renderDeviceStrip(n) {
+    const p = n.platform || {};
+    const row = (label, value, st) => `<div class="row"><span class="hint">${esc(label)}</span><b style="color:${SC[st] || 'inherit'}">${value}</b></div>`;
+    const items = [];
+    if (n.tempC != null) items.push(row('טמפרטורה', `${n.tempC}°`, lvl(n.tempC, 60, 70)));
+    if (n.cpuPct != null) items.push(row('מעבד', `${n.cpuPct}%`, lvl(n.cpuPct, 80, 95)));
+    if (n.memUsedPct != null) items.push(row('זיכרון', `${n.memUsedPct}%`, lvl(n.memUsedPct, 80, 90)));
+    if (n.swapUsedPct != null) items.push(row('זיכרון החלפה (Swap)', `${n.swapUsedPct}%`, lvl(n.swapUsedPct, 50, 80)));
+    if (n.wifi && n.wifi.signalDbm != null) items.push(row('Wi-Fi', `<bdi dir="ltr">${n.wifi.signalDbm} dBm</bdi>`, n.wifi.signalDbm <= -75 ? 'bad' : n.wifi.signalDbm <= -65 ? 'warn' : 'ok'));
+    else if (n.wifi && n.wifi.signalPct != null) items.push(row('Wi-Fi', `${n.wifi.signalPct}%`, lvl(n.wifi.signalPct, 50, 30, true)));
+    if (n.batteryPct != null) items.push(row('סוללה', `${n.batteryPct}%`, lvl(n.batteryPct, 30, 15, true)));
+    if (n.disk) items.push(row('מקום פנוי', `<bdi dir="ltr">${n.disk.freeGb} GB</bdi>`, n.disk.freeGb < 2 ? 'bad' : n.disk.freeGb < 5 ? 'warn' : 'ok'));
+    if (n.throttle) items.push(row('מתח ומעבד', n.throttle.underVoltageNow ? 'מתח נמוך' : n.throttle.tempLimitNow ? 'הגבלת חום' : 'תקין', n.throttle.underVoltageNow || n.throttle.tempLimitNow ? 'bad' : 'ok'));
+    items.push(row('זמן פעילות', `${n.uptimeH} שעות`, 'ok'));
+    const wa = Object.entries(n.wa || {}).map(([id, up]) => row(`וואטסאפ ${(state && state.accounts && state.accounts[id] && state.accounts[id].name) || id}`, up ? 'מחובר' : 'מנותק', up ? 'ok' : 'bad')).join('');
+    const ev = n.events || [];
+    const cnt = t => ev.filter(e => e.type === t).length;
+    const title = [p.model, p.os].filter(Boolean).join(' · ') || 'המכשיר';
+    $('#devStrip').innerHTML = `<div class="card" style="padding:12px"><div class="hint">${esc(title)}</div>${items.join('')}${wa}
+      <div class="hint" style="margin-top:8px">ב-24 השעות האחרונות: ניתוקי Wi-Fi ${cnt('wifi_down')} · ניתוקי וואטסאפ ${cnt('wa_down')}</div></div>`;
+  }
+  setInterval(() => { if (view === 'home' && !document.hidden) loadDashboard().catch(() => {}); }, 10000);
+
+  /* ---------- home sections: open/closed, remembered on this device ---------- */
+  function foldState() { try { return JSON.parse(localStorage.getItem('homeFolds') || '{}'); } catch (e) { return {}; } }
+  function applyFolds() {
+    const st = foldState();
+    document.querySelectorAll('details.fold[data-key]').forEach(d => { if (d.dataset.key in st) d.open = st[d.dataset.key]; });
+  }
+  document.addEventListener('toggle', e => {
+    const d = e.target;
+    if (!(d instanceof HTMLDetailsElement) || !d.classList.contains('fold') || !d.dataset.key) return;
+    const st = foldState(); st[d.dataset.key] = d.open;
+    try { localStorage.setItem('homeFolds', JSON.stringify(st)); } catch (err) {}
+  }, true);
+  applyFolds();
+
   function setView(v) {
     view = v; store('view', v);
     $$('.view').forEach(s => { s.hidden = s.id !== 'view-' + v; });
@@ -822,10 +880,11 @@
     const fab = $('#fab');
     fab.hidden = !(v === 'home' || v === 'collections');
     fab.dataset.act = v === 'collections' ? 'newCol' : 'runChooser';
-    fab.setAttribute('aria-label', v === 'collections' ? 'אוסף חדש' : 'סכם עכשיו');
+    fab.setAttribute('aria-label', v === 'collections' ? 'אוסף חדש' : 'סיכום עכשיו');
     fab.innerHTML = v === 'collections' ? ICON.plus : ICON.spark;
     window.scrollTo(0, 0);
     if (v === 'settings' && state) loadModels();
+    if (v === 'home') loadDashboard();
   }
 
   /* ---------- Gemini model picker ---------- */
@@ -834,7 +893,7 @@
     if (modelsLoaded && !force) return renderModelD();
     const d = await api('/api/gemini/models' + (force ? '?refresh=1' : ''));
     const sel = $('#modelSel');
-    if (!d.ok) { $('#modelD').textContent = d.error ? 'לא ניתן לטעון רשימה: ' + d.error : 'לא ניתן לטעון רשימה'; return; }
+    if (!d.ok) { $('#modelD').textContent = d.error ? 'לא ניתן לטעון את רשימת הדגמים. נא לוודא את תקינות מפתח ה-Gemini.: ' + d.error : 'לא ניתן לטעון את רשימת הדגמים. נא לוודא את תקינות מפתח ה-Gemini.'; return; }
     const list = d.models.slice();
     if (d.selected && !list.some(m => m.id === d.selected)) list.unshift({ id: d.selected, name: d.selected });
     sel.innerHTML = '<option value="">אוטומטי (מומלץ)</option>' + list.map(m => `<option value="${esc(m.id)}">${esc(m.name === m.id ? m.id : m.name + ' · ' + m.id)}</option>`).join('');
@@ -885,12 +944,13 @@
       <div class="set-row" style="margin-top:6px"><div class="txt"><div class="lbl">שליחה אוטומטית</div><div class="d">בשעה קבועה כל יום</div></div>
         <input type="time" id="eTime" class="field" style="width:auto" value="${esc((c && c.time) || '18:00')}" ${hasTime ? '' : 'hidden'} aria-label="שעה">
         <button class="sw-hit" data-act="tgEditorTime" aria-label="שליחה אוטומטית"><span class="sw" id="eHas" role="switch" aria-checked="${hasTime}"></span></button></div>
+      <p class="hint" style="margin-bottom:8px">סמנו את הקבוצות לעקוב אחריהן באוסף. קבוצה שתסירו מכל האוספים תפסיק להיות במעקב.</p>
       <label class="lbl2" for="eSearch">קבוצות באוסף <b id="eCount" style="color:var(--accent)">${editor.selected.size}</b></label>
       <input id="eSearch" type="search" class="field" placeholder="חיפוש קבוצה" autocomplete="off">
       <div class="pick" id="ePick"></div>
       <label class="lbl2" for="ePrompt">הנחיה נוספת לאוסף <span class="muted" style="font-weight:400">(לא חובה)</span></label>
       <textarea id="ePrompt" class="field" rows="4" maxlength="1500" placeholder="מה חשוב או לא חשוב דווקא באוסף הזה. למשל: התמקד בהסעות ובאסיפות הורים">${esc((c && c.prompt) || '')}</textarea>
-      <p class="hint" style="margin-top:6px">מצטרפת להנחיה הכללית (בהגדרות) ומשלימה אותה.</p>`,
+      <p class="hint" style="margin-top:6px">הנחיה זו מצטרפת להנחיה הכללית שבהגדרות ומשלימה אותה עבור אוסף זה.</p>`,
       `${c ? '<button class="btn danger" data-act="delCol">מחיקה</button>' : ''}<button class="btn" data-act="closeSheet">ביטול</button><button class="btn primary" data-act="saveCol">שמירה</button>`);
     renderPicker();
   }
@@ -900,19 +960,88 @@
     const q = ($('#eSearch').value || '').trim().toLowerCase();
     const m = editor.order.filter(j => !q || (groups[j].name || '').toLowerCase().includes(q));
     const shown = m.slice(0, 100);
-    $('#ePick').innerHTML = shown.map(j => `<label><input type="checkbox" data-jid="${esc(j)}" ${editor.selected.has(j) ? 'checked' : ''}><span>${esc(groups[j].name)}</span></label>`).join('')
+    const owner = {};
+    collections(acc()).forEach(c => { if (c.id !== editor.id) (c.jids || []).forEach(j => { owner[j] = c.name; }); });
+    $('#ePick').innerHTML = shown.map(j => `<label><input type="checkbox" data-jid="${esc(j)}" ${editor.selected.has(j) ? 'checked' : ''}><span>${esc(groups[j].name)}${owner[j] && !editor.selected.has(j) ? ` <small class="muted">· ב${esc(owner[j])}</small>` : ''}</span></label>`).join('')
       + (m.length > shown.length ? `<div class="empty hint">מוצגות ${shown.length} מתוך ${m.length}. הקלידו כדי לצמצם.</div>` : '')
       + (!m.length ? '<div class="empty">לא נמצאו קבוצות</div>' : '');
     $('#eCount').textContent = editor.selected.size;
   }
   async function saveEditor() {
     const name = $('#eName').value.trim();
-    if (!name) return toast('יש לתת שם לאוסף');
+    if (!name) return toast('נא להזין שם לאוסף');
     if (!editor.selected.size) return toast('יש לבחור לפחות קבוצה אחת');
     const has = $('#eHas').getAttribute('aria-checked') === 'true';
     const time = has ? $('#eTime').value : null;
     if (has && !time) return toast('יש לבחור שעה');
     const d = await api(`/api/accounts/${cur}/collections`, 'POST', { id: editor.id, name, time, jids: [...editor.selected], enabled: editor.enabled, prompt: $('#ePrompt').value });
+    if (!d.ok) return toast(d.error || 'השמירה נכשלה');
+    closeSheet(); toast('האוסף נשמר'); load(true);
+  }
+
+  /* ---------- people collection editor ---------- */
+  const MAX_PEOPLE = 10;
+  // "1 קבוצות" reads wrong: singular and plural forms for both kinds
+  function countLabel(n, people) { return people ? (n === 1 ? "איש קשר אחד" : n + " אנשי קשר") : (n === 1 ? "קבוצה אחת" : n + " קבוצות"); }
+  let ppSel = new Map(), ppTimer = null, ppSeq = 0, ppRecent = [];
+  const ppLabel = (p, n) => n || ('+' + p);
+  function ppRenderChips() {
+    const box = $('#ppChips'); if (!box) return;
+    box.innerHTML = ppSel.size
+      ? [...ppSel].map(([p, n]) => `<button type="button" class="lab" style="--h:${hue(p)};font-size:.88rem;padding:4px 12px" data-act="ppRm" data-phone="${esc(p)}" aria-label="הסרת ${esc(ppLabel(p, n))}">${esc(ppLabel(p, n))} ✕</button>`).join('')
+      : '<span class="hint">עדיין לא נבחרו אנשי קשר</span>';
+    const cnt = $('#ppCount'); if (cnt) cnt.textContent = `${ppSel.size} מתוך ${MAX_PEOPLE}`;
+  }
+  function ppShow(list, q) {
+    const box = $('#ppSug'); if (!box) return;
+    const digits = q.replace(/[^0-9]/g, '');
+    const row = (phone, name) => `<button type="button" class="opt" style="min-height:52px;padding:8px 14px" data-act="ppPick" data-phone="${esc(phone)}" data-name="${esc(name || '')}"><span class="grow" style="text-align:start"><b>${esc(name || '+' + phone)}</b>${name ? `<div class="hint" dir="ltr" style="text-align:start">+${esc(phone)}</div>` : ''}</span></button>`;
+    const rows = list.filter(c => !ppSel.has(c.phone)).map(c => row(c.phone, c.name));
+    if (digits.length >= 9) {
+      const p = digits.startsWith('0') ? '972' + digits.slice(1) : digits;
+      if (!ppSel.has(p) && !list.some(c => c.phone === p)) rows.push(row(p, ''));
+    }
+    box.innerHTML = rows.join('') || `<div class="empty" style="padding:12px">${q ? 'לא נמצאו אנשי קשר. אפשר להקליד מספר שלם.' : 'הקלידו שם או מספר כדי לחפש.'}</div>`;
+    box.hidden = false;
+  }
+  async function ppSuggest(q) {
+    const seq = ++ppSeq;
+    if (!q.trim()) return ppShow(ppRecent, '');
+    const d = await api(`/api/accounts/${cur}/contacts?q=${encodeURIComponent(q.trim())}`);
+    if (seq === ppSeq && d.ok) ppShow(d.contacts || [], q);
+  }
+  function openPeopleEditor(id) {
+    const a = acc(); const c = id ? a.collections[id] : null;
+    ppSel = new Map(c ? c.jids.map(j => [j.split('@')[0], (c.names || {})[j] || '']) : []);
+    ppRecent = (a.recentContacts || []).slice(0, 12).map(x => ({ phone: x.phone, name: x.name }));
+    editor = { id: c ? c.id : null, kind: 'people', enabled: c ? c.enabled !== false : true };
+    const hasTime = c ? !!c.time : true;
+    openSheet(c ? 'עריכת אוסף אנשי קשר' : 'אוסף אנשי קשר חדש', `
+      <label class="lbl2" for="ppName">שם האוסף</label>
+      <input id="ppName" class="field" maxlength="60" placeholder="למשל: צוות ההנהלה" value="${esc(c ? c.name : '')}">
+      <div class="set-row" style="margin-top:6px"><div class="txt"><div class="lbl">שליחה אוטומטית</div><div class="d">בשעה קבועה כל יום</div></div>
+        <input type="time" id="ppTime" class="field" style="width:auto" value="${esc((c && c.time) || '08:00')}" ${hasTime ? '' : 'hidden'} aria-label="שעה">
+        <button class="sw-hit" data-act="tgPeopleTime" aria-label="שליחה אוטומטית"><span class="sw" id="ppHas" role="switch" aria-checked="${hasTime}"></span></button></div>
+      <label class="lbl2" for="ppSearch">אנשי קשר באוסף <b id="ppCount" style="color:var(--accent)"></b></label>
+      <p class="hint" style="margin-bottom:8px">הסיכום כולל את השיחות הפרטיות שלכם איתם ב-24 השעות האחרונות, גם את מה שכתבתם. אפשר לבחור עד ${MAX_PEOPLE} אנשים. השיחות נשמרות רק מרגע ההוספה, ולכן הסיכום הראשון יכלול רק הודעות מאז.</p>
+      <div class="labs" id="ppChips" style="margin:0 0 10px"></div>
+      <input id="ppSearch" type="search" class="field" placeholder="חיפוש איש קשר, או הקלדת מספר" autocomplete="off">
+      <div class="pick" id="ppSug" hidden></div>
+      <label class="lbl2" for="ppPrompt">הנחיה נוספת לאוסף <span class="muted" style="font-weight:400">(לא חובה)</span></label>
+      <textarea id="ppPrompt" class="field" rows="3" maxlength="1500" placeholder="מה חשוב בשיחות האלה. למשל: התמקד בהחלטות ובמשימות פתוחות">${esc((c && c.prompt) || '')}</textarea>`,
+      `${c ? '<button class="btn danger" data-act="delCol">מחיקה</button>' : ''}<button class="btn" data-act="closeSheet">ביטול</button><button class="btn primary" data-act="savePeople">שמירה</button>`);
+    ppRenderChips();
+  }
+  async function savePeople() {
+    const name = $('#ppName').value.trim();
+    if (!name) return toast('נא להזין שם לאוסף');
+    if (!ppSel.size) return toast('יש לבחור לפחות איש קשר אחד');
+    const has = $('#ppHas').getAttribute('aria-checked') === 'true';
+    const time = has ? $('#ppTime').value : null;
+    if (has && !time) return toast('יש לבחור שעה');
+    const jids = [...ppSel.keys()].map(p => `${p}@s.whatsapp.net`);
+    const names = Object.fromEntries([...ppSel].map(([p, n]) => [`${p}@s.whatsapp.net`, n]));
+    const d = await api(`/api/accounts/${cur}/collections`, 'POST', { kind: 'people', id: editor && editor.id, name, time, jids, names, enabled: editor ? editor.enabled : true, prompt: $('#ppPrompt').value });
     if (!d.ok) return toast(d.error || 'השמירה נכשלה');
     closeSheet(); toast('האוסף נשמר'); load(true);
   }
@@ -923,7 +1052,7 @@
   const arPhoneLabel = (p, n) => n || ('+' + p);
   function renderArChips() {
     const box = $('#arChips'); if (!box) return;
-    box.innerHTML = arSel.size ? [...arSel].map(([p, n]) => `<button type="button" class="lab" style="--h:${hue(p)};font-size:.88rem;padding:4px 12px" data-act="rmPhone" data-phone="${esc(p)}" aria-label="הסרת ${esc(arPhoneLabel(p, n))}">${n ? esc(n) : `<span class="num">+${esc(p)}</span>`} ✕</button>`).join('') : '<span class="hint">עדיין לא נבחרו אנשים</span>';
+    box.innerHTML = arSel.size ? [...arSel].map(([p, n]) => `<button type="button" class="lab" style="--h:${hue(p)};font-size:.88rem;padding:4px 12px" data-act="rmPhone" data-phone="${esc(p)}" aria-label="הסרת ${esc(arPhoneLabel(p, n))}">${n ? esc(n) : `<span class="num">+${esc(p)}</span>`} ✕</button>`).join('') : '<span class="hint">עדיין לא נבחרו אנשי קשר</span>';
   }
   function arShow(list, q) {
     const box = $('#arSug'); if (!box) return;
@@ -948,21 +1077,21 @@
       <input type="hidden" id="arId" value="${esc(r ? r.id : '')}">
       <label class="lbl2" for="arName">שם הכלל</label>
       <input id="arName" class="field" maxlength="60" placeholder="למשל: מחוץ לשעות העבודה" value="${esc(r ? r.name : '')}">
-      <label class="lbl2" for="arSearch">למי לענות</label>
+      <label class="lbl2" for="arSearch">אנשי קשר למענה אוטומטי</label>
       <div class="labs" id="arChips" style="margin:0 0 10px"></div>
       <input id="arSearch" type="search" class="field" placeholder="חיפוש איש קשר, או הקלדת מספר" autocomplete="off">
       <div class="pick" id="arSug" hidden></div>
       <div class="hint" style="margin-top:8px">${a.contactCount ? `${a.contactCount} אנשי קשר זמינים לחיפוש.` : 'עדיין לא נטענו אנשי קשר.'}</div>
       <label class="lbl2">בין השעות</label>
       <div style="display:flex;gap:10px;align-items:center"><input type="time" id="arStart" class="field" style="width:auto" value="${esc(r ? r.start : '18:00')}"><span class="muted">עד</span><input type="time" id="arEnd" class="field" style="width:auto" value="${esc(r ? r.end : '08:00')}"></div>
-      <div class="hint" style="margin-top:6px">אם שעת הסיום קטנה מהתחלה, הטווח עובר את חצות.</div>
+      <div class="hint" style="margin-top:6px">אם שעת הסיום מוקדמת משעת ההתחלה, פעילות המענה תימשך ברצף מעבר לחצות.</div>
       <label class="lbl2">בימים</label>
       <div class="seg" id="arDays" style="margin:0">${DAYS.map((d, i) => `<button type="button" data-act="tgDay" data-d="${i}" aria-pressed="${days.has(i)}" style="min-width:42px;padding:0 10px">${d}</button>`).join('')}</div>
-      <div class="hint" style="margin-top:6px">בלי סימון: כל הימים.</div>
+      <div class="hint" style="margin-top:6px">אם לא ייבחרו ימים ספציפיים, המענה יפעל בכל ימות השבוע.</div>
       <label class="lbl2" for="arText">ההודעה</label>
       <textarea id="arText" class="field" rows="4" maxlength="1000" placeholder="שלום, אני לא זמין כרגע ואחזור אליך מחר בבוקר. (הודעה אוטומטית)">${esc(r ? r.text : '')}</textarea>
       <div class="set-row" style="margin-top:8px"><div class="txt"><div class="lbl">התאמה אישית קלה עם AI</div><div class="d">פנייה בשם הפרטי וניסוח שמתאים למה שנכתב, בלי להוסיף תוכן. אם ה-AI לא זמין נשלח הנוסח שלמעלה. שם השולח וההודעה שלו נשלחים ל-Gemini.</div></div><button type="button" class="sw-hit" data-act="tgArAi" aria-label="התאמה אישית עם AI"><span class="sw" id="arAi" role="switch" aria-checked="${r ? Boolean(r.ai) : false}"></span></button></div>
-      <label class="lbl2" for="arCool">לא לחזור על המענה לאותו אדם לפני</label>
+      <label class="lbl2" for="arCool">מרווח זמן בין מענים חוזרים לאותו איש קשר</label>
       <select id="arCool" class="field">${[[6, '6 שעות'], [12, '12 שעות'], [24, 'יממה'], [72, '3 ימים']].map(([v, l]) => `<option value="${v}" ${(r ? r.cooldownHours : 12) === v ? 'selected' : ''}>${l}</option>`).join('')}</select><div class="err" id="arErr" role="alert"></div>`,
       `${r ? '<button class="btn danger" data-act="delAr">מחיקה</button>' : ''}<button class="btn" data-act="closeSheet">ביטול</button><button class="btn primary" data-act="saveAr">שמירה</button>`);
     renderArChips();
@@ -970,18 +1099,18 @@
 
   /* ---------- running summaries ---------- */
   async function run(label, jids, collectionId) {
-    if (busy || (state.running && Date.now() - state.running.since < 15 * 60000)) return toast(state.running ? `כבר רץ סיכום: ${state.running.label.replace(/^אוסף: /, '')}. נסו שוב כשיסתיים.` : 'סיכום כבר רץ, נא להמתין');
+    if (busy || (state.running && Date.now() - state.running.since < 15 * 60000)) return toast(state.running ? `הפקת סיכום כבר מתבצעת כעת עבור: ${state.running.label.replace(/^אוסף: /, '')}. נא להמתין לסיומה.` : 'סיכום כבר רץ, נא להמתין');
     if (!state.hasGeminiKey) { toast('חסר מפתח Gemini'); return setView('settings'); }
     busy = true; toast('מסכם ושולח… זה יכול לקחת עד כמה דקות', 0);
     try {
       const d = await api(`/api/accounts/${cur}/summarize`, 'POST', { jids, label, collectionId });
       if (d.busy) toast(d.error);
-      else if (!d.ok) toast(d.error ? 'לא הצליח: ' + d.error.slice(0, 90) : 'לא הצליח');
-      else if (/^אין משהו חשוב/.test(d.summary || '')) toast('אין משהו חשוב או דחוף, לא נשלחה הודעה');
+      else if (!d.ok) toast(d.error ? 'הפקת הסיכום נכשלה: ' + d.error.slice(0, 90) + '. נא לנסות שנית' : 'הפקת הסיכום נכשלה. נא לנסות שנית');
+      else if (/^אין משהו חשוב/.test(d.summary || '')) toast('לא אותרו עדכונים דחופים או חשובים, לא נשלחה הודעה');
       else if (/^(אין הודעות|לא נמצאו)/.test(d.summary || '')) toast('אין הודעות חדשות לסכם');
       else if (d.delivery === 'queued') toast('הסיכום מוכן וממתין בתור. הוא יישלח ברגע שהחיבור לוואטסאפ יחזור.', 6000);
       else toast('הסיכום נשלח');
-    } catch (e) { toast('התקשורת נותקה. ייתכן שהסיכום עדיין נשלח, בדקו בהיסטוריה'); }
+    } catch (e) { toast('הקשר עם השרת נותק זמנית. ייתכן שהסיכום עדיין נשלח, בדקו בהיסטוריה'); }
     busy = false; load(true);
   }
   function runLabel(label) {
@@ -990,22 +1119,18 @@
       const c = collections(a).find(x => `אוסף: ${x.name}` === label);
       if (c) return run(label, c.jids, c.id);
     }
-    const mj = mainJids(a);
-    if (mj.length) return run('סיכום ראשי', mj);
-    toast('אין קבוצות לסכם');
+    toast('לא נבחרו קבוצות באוסף זה. יש לשייך קבוצות לאוסף כדי להפיק סיכום.');
   }
   function runChooser() {
-    const a = acc(); const mj = mainJids(a); const cols = collections(a);
-    openSheet('סכם עכשיו', `<div class="card" style="margin-top:4px">
-      <button class="opt" data-act="runMain" ${mj.length ? '' : 'disabled'}><span><b>סיכום ראשי</b><div class="hint">שאר הקבוצות במעקב</div></span><span class="chip">${mj.length} קבוצות</span></button>
-      ${cols.map(c => `<button class="opt" data-act="runCol" data-id="${esc(c.id)}"><span><b>${esc(c.name)}</b></span><span class="chip">${(c.jids || []).length} קבוצות</span></button>`).join('')}
-    </div><p class="hint" style="margin-top:12px">סיכום ידני מסכם את 24 השעות האחרונות ונשלח לוואטסאפ. אם אין משהו חשוב לא תישלח הודעה.</p>`);
+    const a = acc(); const cols = collections(a);
+    openSheet('סיכום עכשיו', `<div class="card" style="margin-top:4px">
+      ${cols.map(c => `<button class="opt" data-act="runCol" data-id="${esc(c.id)}"><span><b>${esc(c.name)}</b></span><span class="chip">${countLabel((c.jids || []).length, c.kind === 'people')}</span></button>`).join('')}
+    </div><p class="hint" style="margin-top:12px">סיכום יזום סוקר את ההודעות שהתקבלו ב-24 השעות האחרונות ונשלח לוואטסאפ. אם לא אותרו עדכונים דחופים או חשובים, לא תישלח הודעה.</p>`);
   }
 
   /* ---------- actions ---------- */
   const A = {
     async runChooser() { runChooser(); },
-    async runMain() { closeSheet(); runLabel('סיכום ראשי'); },
     async runCol(el) { closeSheet(); const c = acc().collections[el.dataset.id]; if (c) run(`אוסף: ${c.name}`, c.jids, c.id); },
     async refreshModels() { $('#modelRes').textContent = ''; await loadModels(true); toast('הרשימה עודכנה'); },
     async testModel() {
@@ -1015,24 +1140,6 @@
       res.textContent = d.ok ? `תקין · ${(d.ms / 1000).toFixed(1)} שניות` : `${d.error || 'נכשל'}${d.ms ? ` · ${(d.ms / 1000).toFixed(1)} שניות` : ''}`;
     },
     async retry(el) { const c = el.dataset.id && acc().collections[el.dataset.id]; if (c) return run(`אוסף: ${c.name}`, c.jids, c.id); runLabel(el.dataset.label); },
-    async moveGroup(el) {
-      const a = acc(); const jid = el.dataset.jid; const g = a.monitoredGroups[jid]; if (!g) return;
-      const cols = collections(a);
-      const inCols = cols.filter(c => (c.jids || []).includes(jid));
-      const current = inCols.length === 1 ? inCols[0].id : '';
-      const note = inCols.length > 1 ? `<p class="hint" style="margin-bottom:10px">הקבוצה נמצאת כרגע ב-${inCols.length} אוספים. בחירה תשאיר אותה באחד בלבד.</p>` : '';
-      const opt = (val, label, sub) => `<label class="mv-opt"><input type="radio" name="mv" value="${esc(val)}" ${val === current && inCols.length <= 1 ? 'checked' : ''}><span><b>${esc(label)}</b>${sub ? `<div class="hint">${esc(sub)}</div>` : ''}</span></label>`;
-      openSheet('העברה לאוסף', `<p class="muted" style="margin-bottom:10px;overflow-wrap:anywhere">${esc(g.name)}</p>${note}<div class="card">${opt('', 'בלי אוסף', g.enabled ? 'תסוכם בסיכום הראשי' : 'לא במעקב')}${cols.map(c => opt(c.id, c.name, c.time ? 'שליחה ב-' + c.time : 'ידני בלבד')).join('')}</div>${g.enabled ? '' : '<p class="hint" style="margin-top:10px">העברה לאוסף תפעיל מעקב אחרי הקבוצה.</p>'}`,
-        `<button class="btn" data-act="closeSheet">ביטול</button><button class="btn primary" data-act="saveMove" data-jid="${esc(jid)}">שמירה</button>`);
-    },
-    async saveMove(el) {
-      const pick = $('input[name=mv]:checked');
-      const collectionId = pick ? pick.value : ($('input[name=mv][value=""]') ? '' : null);
-      if (collectionId === null) return toast('יש לבחור יעד');
-      const d = await api(`/api/accounts/${cur}/move-group`, 'POST', { jid: el.dataset.jid, collectionId: collectionId || null });
-      if (!d.ok) return toast(d.error || 'ההעברה נכשלה');
-      closeSheet(); toast(collectionId ? 'הקבוצה הועברה' : 'הקבוצה הוצאה מהאוסף'); load(true);
-    },
     async switchAcc(el) { cur = el.dataset.id; store('cur', cur); renderAll(); setView('home'); },
     async renameAcc(el) {
       const id = el.dataset.id; const a = state.accounts[id]; if (!a) return;
@@ -1046,14 +1153,14 @@
       closeSheet(); toast('השם נשמר'); load(true);
     },
     async addAcc() {
-      openSheet('הוספת חשבון', `<p class="hint">חשבון הוא וואטסאפ אחד שמקבל סיכומים משלו, עם קבוצות והנחיה משלו. אחרי ההוספה יוצג קוד QR לקישור הטלפון.</p><label class="lbl2" for="aIn">שם החשבון</label><input id="aIn" class="field" maxlength="40" placeholder="למשל: אשתי">`,
+      openSheet('הוספת חשבון', `<p class="hint">הוספת חשבון מייצגת מספר וואטסאפ נפרד המנוהל במערכת, עם סיכומים, קבוצות והנחיה משלו. לאחר ההוספה יוצג קוד QR לקישור המכשיר.</p><label class="lbl2" for="aIn">שם החשבון</label><input id="aIn" class="field" maxlength="40" placeholder="למשל: אשתי">`,
         `<button class="btn" data-act="closeSheet">ביטול</button><button class="btn primary" data-act="saveAcc">הוספה</button>`);
     },
     async saveAcc() {
       const name = $('#aIn').value.trim(); if (!name) return toast('יש להזין שם');
       const d = await api('/api/accounts/add', 'POST', { name });
       if (!d.ok) return toast(d.error || 'ההוספה נכשלה');
-      closeSheet(); toast('החשבון נוסף. מכין קוד QR…');
+      closeSheet(); toast('החשבון נוסף. קוד ה-QR נוצר כעת, נא להמתין…');
       cur = d.id; setView('home');
       setTimeout(() => load(true), 1500); setTimeout(() => load(true), 4000);
     },
@@ -1073,8 +1180,8 @@
     async syncContacts(el) {
       const d = await api(`/api/accounts/${cur}/sync-contacts`, 'POST');
       if (!d.ok) return toast(d.error || 'הטעינה נכשלה');
-      if (d.already) return toast(`כבר נטענו ${d.already} אנשי קשר. אין צורך לטעון שוב`);
-      toast('טוען אנשי קשר מהטלפון. זה יכול לקחת כדקה, ואז חפשו שוב.', 6000);
+      if (d.already) return toast(`במערכת שמורים כבר ${d.already} אנשי קשר. הרשימה מעודכנת.`);
+      toast('טוען את אנשי הקשר מחשבון הוואטסאפ. הפעולה עשויה להימשך כדקה; לאחר מכן ניתן לחפש.', 6000);
       setTimeout(() => load(true), 20000);
     },
     async tgArAi() { const s = $('#arAi'); s.setAttribute('aria-checked', s.getAttribute('aria-checked') !== 'true'); },
@@ -1082,7 +1189,7 @@
       const r = acc().autoReplies[el.dataset.id]; if (!r) return;
       r.enabled = r.enabled === false; renderSettings(acc());
       const d = await api(`/api/accounts/${cur}/auto-replies`, 'POST', { ...r });
-      toast(d.ok ? (r.enabled === false ? `"${r.name}" הושהה` : `"${r.name}" פעיל`) : (d.error || 'השמירה נכשלה'));
+      toast(d.ok ? (r.enabled === false ? `"${r.name}" הושהה` : `"${r.name}" הופעל`) : (d.error || 'השמירה נכשלה'));
       load(true);
     },
     async saveAr() {
@@ -1099,24 +1206,38 @@
       const id = $('#arId').value; if (!id) return;
       const name = acc().autoReplies[id].name;
       sheetResolve = null; $('#sheet').hidden = true; document.body.style.overflow = '';
-      if (await confirmSheet('מחיקת כלל', `הכלל "${name}" יימחק.`, 'מחיקה', true)) {
+      if (await confirmSheet('מחיקת כלל מענה אוטומטי', `כלל המענה "${name}" יימחק ולא יופעל עוד.`, 'מחיקה', true)) {
         closeSheet(); await api(`/api/accounts/${cur}/auto-replies/${id}`, 'DELETE'); toast('הכלל נמחק'); load(true);
       }
     },
-    async newCol() { openEditor(null); },
-    async editCol(el) { openEditor(el.dataset.id); },
+    async newCol() {
+      openSheet('אוסף חדש', `<div class="card" style="margin-top:4px">
+        <button class="opt" data-act="newGroupsCol"><span><b>אוסף קבוצות</b><div class="hint">סיכום של קבוצות וואטסאפ שתבחרו</div></span></button>
+        <button class="opt" data-act="newPeopleCol"><span><b>אוסף אנשי קשר</b><div class="hint">סיכום השיחות הפרטיות שלכם עם עד ${MAX_PEOPLE} אנשים חשובים</div></span></button>
+      </div>`);
+    },
+    async newGroupsCol() { closeSheet(); openEditor(null); },
+    async newPeopleCol() { closeSheet(); openPeopleEditor(null); },
+    async editCol(el) {
+      const c = acc().collections[el.dataset.id];
+      if (c && c.kind === 'people') openPeopleEditor(c.id); else openEditor(el.dataset.id);
+    },
+    async ppPick(el) {
+      if (ppSel.size >= MAX_PEOPLE) return toast(`אפשר לבחור עד ${MAX_PEOPLE} אנשי קשר באוסף`);
+      ppSel.set(el.dataset.phone, el.dataset.name || '');
+      const q = $('#ppSearch'); q.value = ''; ppRenderChips(); ppSuggest(''); q.focus();
+    },
+    async ppRm(el) { ppSel.delete(el.dataset.phone); ppRenderChips(); ppSuggest($('#ppSearch').value); },
+    async tgPeopleTime() {
+      const sw = $('#ppHas'); const on = sw.getAttribute('aria-checked') !== 'true';
+      sw.setAttribute('aria-checked', on); $('#ppTime').hidden = !on;
+    },
+    async savePeople() { await savePeople(); },
     async tgCol(el) {
       const c = acc().collections[el.dataset.id]; if (!c) return;
       c.enabled = c.enabled === false; renderCollections(acc()); renderHome(acc());
       const d = await api(`/api/accounts/${cur}/collections`, 'POST', { ...c });
-      toast(d.ok ? (c.enabled === false ? `"${c.name}" הושהה` : `"${c.name}" פעיל`) : 'השמירה נכשלה');
-      load(true);
-    },
-    async tgGroup(el) {
-      const g = acc().monitoredGroups[el.dataset.jid]; if (!g) return;
-      g.enabled = !g.enabled; renderGroups(acc());
-      const d = await api(`/api/accounts/${cur}/toggle-group`, 'POST', { jid: el.dataset.jid, enabled: g.enabled });
-      toast(d.error ? 'השמירה נכשלה' : (g.enabled ? 'המעקב אחרי הקבוצה הופעל' : 'המעקב אחרי הקבוצה כובה'));
+      toast(d.ok ? (c.enabled === false ? `"${c.name}" הושהה` : `"${c.name}" הופעל`) : 'השמירה נכשלה');
       load(true);
     },
     async tgEditorTime() {
@@ -1126,9 +1247,11 @@
     async saveCol() { await saveEditor(); },
     async delCol() {
       const id = editor && editor.id; if (!id) return;
+      if (id === 'general') return toast('לא ניתן למחוק את האוסף הכללי של המערכת.');
       const name = acc().collections[id].name;
+      const isPeople = acc().collections[id].kind === 'people';
       sheetResolve = null; $('#sheet').hidden = true; document.body.style.overflow = ''; editor = null;
-      if (await confirmSheet('מחיקת אוסף', `האוסף "${name}" יימחק. הקבוצות עצמן לא יימחקו.`, 'מחיקה', true)) {
+      if (await confirmSheet('מחיקת אוסף', isPeople ? `האוסף "${name}" יימחק, והשיחות הפרטיות שנשמרו בו לא ייכללו עוד בסיכומים. אנשי הקשר עצמם לא יושפעו.` : `האוסף "${name}" יימחק. הקבוצות שבו יועברו לאוסף הכללי ויישארו במעקב.`, 'מחיקה', true)) {
         closeSheet(); await api(`/api/accounts/${cur}/collections/${id}`, 'DELETE'); toast('האוסף נמחק'); load(true);
       }
     },
@@ -1136,19 +1259,19 @@
     async sheetOk() { closeSheet(true); },
     async tgSelf() {
       const a = acc(); a.sendToSelf = a.sendToSelf === false; renderSettings(a);
-      await api(`/api/accounts/${cur}/delivery-settings`, 'POST', { sendToSelf: a.sendToSelf }); toast('נשמר');
+      await api(`/api/accounts/${cur}/delivery-settings`, 'POST', { sendToSelf: a.sendToSelf }); toast('ההגדרה נשמרה בהצלחה');
     },
     async tgExtra() {
       const a = acc(); a.sendToCustomPhone = !a.sendToCustomPhone; renderSettings(a);
       await api(`/api/accounts/${cur}/delivery-settings`, 'POST', { sendToCustomPhone: a.sendToCustomPhone, customPhone: $('#extraPhone').value });
-      toast('נשמר'); if (a.sendToCustomPhone) $('#extraPhone').focus();
+      toast('ההגדרה נשמרה בהצלחה'); if (a.sendToCustomPhone) $('#extraPhone').focus();
     },
     async savePrompt() {
       const pr = $('#prompt'); const d = await api(`/api/accounts/${cur}/settings`, 'POST', { prompt: pr.value });
       if (d.ok) { delete pr.dataset.dirty; toast('ההנחיה נשמרה'); load(true); } else toast('השמירה נכשלה');
     },
     async relink() {
-      if (await confirmSheet('התחברות מחדש', 'החיבור יתחדש עם הקישור הקיים, בלי QR. זה עוזר כשהחיבור נתקע.', 'התחברות מחדש', false)) {
+      if (await confirmSheet('חידוש החיבור', 'החיבור יתחדש באמצעות הקישור הקיים, ללא סריקת קוד QR. פעולה זו מומלצת כשהחיבור נתקע.', 'חידוש החיבור', false)) {
         await api(`/api/accounts/${cur}/relink`, 'POST'); toast('מתחבר מחדש…'); setView('home'); load(true);
       }
     },
@@ -1161,7 +1284,7 @@
         'בזמן הקישור לא נקלטות הודעות חדשות, וקישור גדול עלול להעמיס על ה-Pi.', 'התחלת קישור', false);
       if (!ok) return;
       const d = await api(`/api/accounts/${cur}/relink-history`, 'POST');
-      if (!d.ok) return toast(d.error || 'הפעולה נכשלה');
+      if (!d.ok) return toast(d.error || 'הפעולה לא הושלמה. נא לנסות שוב.');
       toast('מכין קוד QR…'); setView('home');
       setTimeout(() => load(true), 2500); setTimeout(() => load(true), 6000);
     },
@@ -1175,7 +1298,7 @@
         : id === me.accountId ? 'שינוי הסיסמה מנתק את כל הדפדפנים האחרים של החשבון הזה.' : `עם הסיסמה הזו נכנסים לחשבון של ${esc(a.name)} בלבד.`;
       openSheet(has ? `סיסמה: ${a.name}` : `קביעת סיסמה: ${a.name}`, `
         <p class="hint">${intro}</p>
-        <p class="hint" style="margin-top:6px">הסיסמה עצמה לא נשמרת: ב-Pi נשמרת רק טביעת אצבע מוצפנת שלה.</p>
+        <p class="hint" style="margin-top:6px">הסיסמה אינה נשמרת במערכת, אלא רק מזהה מוצפן ובלתי הפיך.</p>
         <label class="lbl2" for="pw1">סיסמה חדשה (8 תווים לפחות)</label>
         <input id="pw1" type="password" class="field" autocomplete="new-password">
         <label class="lbl2" for="pw2">שוב, לאימות</label>
@@ -1185,7 +1308,7 @@
     },
     async savePassword(el) {
       const p1 = $('#pw1').value, p2 = $('#pw2').value;
-      if (p1.length < 8) { $('#pwErr').textContent = 'סיסמה של 8 תווים לפחות'; return; }
+      if (p1.length < 8) { $('#pwErr').textContent = 'על הסיסמה להכיל לפחות 8 תווים.'; return; }
       if (p1 !== p2) { $('#pwErr').textContent = 'שתי הסיסמאות לא זהות'; return; }
       const d = await api('/api/auth/password', 'POST', { accountId: el.dataset.id, password: p1 });
       if (!d.ok) { $('#pwErr').textContent = d.error || 'השמירה נכשלה'; return; }
@@ -1195,7 +1318,7 @@
       const id = el.dataset.id; const name = (state.accounts[id] || {}).name;
       sheetResolve = null; $('#sheet').hidden = true; document.body.style.overflow = '';
       const last = Object.values((state.me || {}).passwords || {}).filter(Boolean).length <= 1;
-      if (!await confirmSheet('הסרת סיסמה', last ? 'זו הסיסמה האחרונה: אחרי ההסרה הדשבורד יהיה פתוח לכל מי שברשת.' : `לחשבון של ${name} לא תהיה סיסמה, ולא יהיה אפשר להיכנס אליו בנפרד.`, 'הסרה', true)) return;
+      if (!await confirmSheet('הסרת סיסמה', last ? 'זו הסיסמה האחרונה: אחרי ההסרה לוח הבקרה יהיה פתוח לכל מי שברשת.' : `לחשבון של ${name} לא תהיה סיסמה, ולא יהיה אפשר להיכנס אליו בנפרד.`, 'הסרה', true)) return;
       closeSheet();
       const d = await api('/api/auth/password', 'POST', { accountId: id, remove: true });
       toast(d.ok ? 'הסיסמה הוסרה' : (d.error || 'ההסרה נכשלה')); load(true);
@@ -1209,7 +1332,7 @@
       if (!d.ok) return toast(d.error || 'לא ניתן לטעון את היומן');
       const kinds = { alert: 'התראה', send: 'שליחה', crash: 'שגיאה', start: 'הפעלה' };
       const rows = (d.errors || []).map(e => `<div class="opt" style="display:block;min-height:0;padding:10px 4px"><div class="hint" style="margin-bottom:2px"><span class="num">${esc(whenLabel(e.ts))}</span> · ${esc(kinds[e.kind] || e.kind)}${e.account ? ' · ' + esc(e.account) : ''}</div><div>${esc(e.text)}</div></div>`).join('');
-      openSheet('יומן תקלות', rows || '<div class="empty">אין רישומים. הכול שקט.</div>');
+      openSheet('יומן תקלות', rows || '<div class="empty">אין תקלות מתועדות. פעילות המערכת תקינה.</div>');
     },
     async editKey() {
       openSheet('מפתח Gemini', `<p class="hint">אפשר ליצור מפתח חינמי ב-<a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Google AI Studio</a>.</p><label class="lbl2" for="kIn">המפתח</label><input id="kIn" type="password" class="field" dir="ltr" placeholder="AIza…" autocomplete="off">`,
@@ -1218,9 +1341,9 @@
     async editAlerts() {
       const rnd = 'wa-' + Array.from(crypto.getRandomValues(new Uint8Array(16)), b => (b % 36).toString(36)).join('');
       const cur_ = state.alertTopic || rnd;
-      openSheet('התראות לטלפון', `<p class="hint">ההתראה מגיעה לאפליקציית <b>ntfy</b> (חינמית, בלי חשבון). היא נשלחת כשהחיבור לוואטסאפ נופל, כשהקליטה נתקעת, או כשסיכום נכשל. ההודעה כוללת רק מה התקלקל, בלי תוכן מוואטסאפ.</p>
+      openSheet('התראות לטלפון', `<p class="hint">ההתראות מועברות ליישומון <b>ntfy</b> (חינמי, ללא צורך בהרשמה). היא נשלחת כשהחיבור לוואטסאפ מנותק 5 דקות ומעלה, כשהקליטה נתקעת, או כשסיכום נכשל. ניתוקים קצרים שחוזרים מעצמם לא מתריעים. ההודעה כוללת רק מה התקלקל, בלי תוכן מוואטסאפ.</p>
         <ol class="hint" style="margin:10px 18px;line-height:1.8"><li>מתקינים את ntfy בטלפון.</li><li>מוסיפים מנוי (Subscribe) לנושא שמופיע למטה.</li><li>שומרים כאן ולוחצים "שליחת בדיקה".</li></ol>
-        <label class="lbl2" for="alIn">שם הנושא (סוד: מי שמכיר אותו יכול לקרוא את ההתראות)</label>
+        <label class="lbl2" for="alIn">שם ערוץ ההתראות (מזהה פרטי: מי שמכיר אותו יכול לקרוא את ההתראות)</label>
         <input id="alIn" class="field" dir="ltr" value="${esc(cur_)}" autocomplete="off" style="font-family:monospace;font-size:1.05rem">
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn small" data-act="copyTopic">העתקת השם</button><a class="btn small" href="https://ntfy.sh/${esc(cur_)}" target="_blank" rel="noopener noreferrer">פתיחה בדפדפן</a><a class="btn small" href="ntfy://ntfy.sh/${esc(cur_)}">הרשמה באפליקציה</a></div>
         <div id="alRes" class="hint" style="margin-top:10px"></div>`,
@@ -1234,52 +1357,49 @@
       $('#alRes').innerHTML = `נשמר. ההתראות נשלחות לנושא: <b class="num" dir="ltr">${esc(topic)}</b>`;
       toast('ההגדרה נשמרה'); load(true);
     },
-    async copyTopic() { const t = $('#alIn').value.trim(); try { await navigator.clipboard.writeText(t); toast('שם הנושא הועתק'); } catch (e) { toast('ההעתקה לא נתמכת, סמנו את הטקסט ידנית'); } },
+    async copyTopic() { const t = $('#alIn').value.trim(); try { await navigator.clipboard.writeText(t); toast('שם הערוץ הועתק'); } catch (e) { toast('ההעתקה אינה נתמכת בדפדפן זה. יש לסמן ולהעתיק את הטקסט באופן ידני.'); } },
     async offAlerts() { await api('/api/config/alerts', 'POST', { topic: '' }); closeSheet(); toast('ההתראות כובו'); load(true); },
     async testAlert() {
       await A.saveAlerts();
       const d = await api('/api/config/alerts/test', 'POST');
       const t = $('#alIn').value.trim();
-      $('#alRes').innerHTML = d.ok ? `נשלחה בדיקה לנושא <b class="num" dir="ltr">${esc(t)}</b>. אם לא הגיעה: ודאו שהאפליקציה רשומה לנושא הזה בדיוק, ושהתראות מותרות לה בהגדרות הטלפון.` : esc(d.error || 'הבדיקה נכשלה');
+      $('#alRes').innerHTML = d.ok ? `הודעת בדיקה נשלחה לערוץ <b class="num" dir="ltr">${esc(t)}</b>. אם ההודעה לא הגיעה, ודאו שהאפליקציה רשומה לערוץ זה בדיוק ושההתראות מאושרות בהגדרות הטלפון.` : esc(d.error || 'הבדיקה נכשלה');
       toast(d.ok ? 'נשלחה בדיקה. בדקו את הטלפון' : (d.error || 'הבדיקה נכשלה'));
     },
     async saveKey() {
-      const key = $('#kIn').value.trim(); if (!key) return toast('לא הוזן מפתח');
+      const key = $('#kIn').value.trim(); if (!key) return toast('נא להזין מפתח Gemini תקף.');
       await api('/api/config/gemini-key', 'POST', { key }); closeSheet(); toast('המפתח נשמר'); load(true);
     },
     async moreHistory() { histLimit += 10; renderHome(acc()); },
-    async moreGroups() { groupLimit += 60; renderGroups(acc()); },
     async expandLast() { $('#lastBody').classList.remove('clamped'); const b = document.querySelector('[data-act="expandLast"]'); if (b) b.remove(); },
     async copyLast() {
       const t = $('#lastSummary').dataset.text || '';
-      try { await navigator.clipboard.writeText(t); toast('הועתק'); } catch (e) { toast('ההעתקה לא נתמכת בדפדפן הזה'); }
+      try { await navigator.clipboard.writeText(t); toast('הועתק'); } catch (e) { toast('ההעתקה אינה נתמכת בדפדפן זה. יש לסמן ולהעתיק את הטקסט באופן ידני.'); }
     }
   };
 
   document.addEventListener('click', e => {
     const tab = e.target.closest('.tab'); if (tab) return setView(tab.dataset.tab);
     const f = e.target.closest('[data-filter]');
-    if (f) { gFilter = f.dataset.filter; $$('[data-filter]').forEach(b => b.setAttribute('aria-pressed', b === f)); return renderGroups(acc(), true); }
     if (e.target.id === 'sheet') return closeSheet(false);
     const el = e.target.closest('[data-act]');
     if (el && A[el.dataset.act]) {
       const act = el.dataset.act, saver = /^(save|del|test|sheetOk)/.test(act) && el.classList.contains('btn');
       const label = el.textContent;
       el.classList.add('is-busy'); if (saver) el.textContent = act.startsWith('test') ? 'בודק…' : 'שומר…';
-      Promise.resolve(A[act](el)).catch(err => toast('שגיאה: ' + (err && err.message || err), 5000, 'err')).finally(() => { el.classList.remove('is-busy'); if (saver && el.isConnected) el.textContent = label; });
+      Promise.resolve(A[act](el)).catch(err => toast('הפעולה נכשלה עקב שגיאת תקשורת: ' + (err && err.message ? err.message : 'נא לנסות שוב'), 5000, 'err')).finally(() => { el.classList.remove('is-busy'); if (saver && el.isConnected) el.textContent = label; });
     }
   });
   document.addEventListener('input', e => {
-    if (e.target.id === 'gSearch') { gQuery = e.target.value; renderGroups(acc(), true); }
-    else if (e.target.id === 'eSearch') renderPicker();
+    if (e.target.id === 'eSearch') renderPicker();
+    else if (e.target.id === 'ppSearch') { clearTimeout(ppTimer); const v = e.target.value; ppTimer = setTimeout(() => ppSuggest(v), 180); }
     else if (e.target.id === 'arSearch') { clearTimeout(arTimer); const v = e.target.value; arTimer = setTimeout(() => arSuggest(v), 180); }
     else if (e.target.id === 'prompt') e.target.dataset.dirty = '1';
   });
   document.addEventListener('change', async e => {
     const t = e.target;
     if (t.matches('#ePick input')) { t.checked ? editor.selected.add(t.dataset.jid) : editor.selected.delete(t.dataset.jid); $('#eCount').textContent = editor.selected.size; }
-    else if (t.id === 'mainTime' && t.value) { await api(`/api/accounts/${cur}/settings`, 'POST', { summaryTime: t.value }); toast('השעה נשמרה'); load(true); }
-    else if (t.id === 'extraPhone') { await api(`/api/accounts/${cur}/delivery-settings`, 'POST', { customPhone: t.value }); toast('נשמר'); load(true); }
+    else if (t.id === 'extraPhone') { await api(`/api/accounts/${cur}/delivery-settings`, 'POST', { customPhone: t.value }); toast('ההגדרה נשמרה בהצלחה'); load(true); }
     else if (t.id === 'accSel') { cur = t.value; store('cur', cur); renderAll(); }
     else if (t.id === 'modelSel') {
       const d = await api('/api/gemini/model', 'POST', { model: t.value });
@@ -1296,9 +1416,9 @@
       if (dg.length >= 9) { arSel.set(dg.startsWith('0') ? '972' + dg.slice(1) : dg, ''); e.target.value = ''; renderArChips(); arSuggest(''); }
     }
   });
-  document.addEventListener('focusin', e => { if (e.target.id === 'arSearch' && !e.target.value) arSuggest(''); });
+  document.addEventListener('focusin', e => { if (e.target.id === 'arSearch' && !e.target.value) arSuggest(''); if (e.target.id === 'ppSearch' && !e.target.value) ppSuggest(''); });
 
-  setView(['home', 'collections', 'groups', 'settings'].includes(view) ? view : 'home');
+  setView(['home', 'collections', 'settings'].includes(view) ? view : 'home');
   // stale-while-revalidate: show the last known state at once, then refresh from the server
   try {
     const cached = store('statusCache');

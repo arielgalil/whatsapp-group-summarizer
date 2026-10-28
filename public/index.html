@@ -285,7 +285,7 @@
   .kpi { min-width: 0; overflow-wrap: anywhere; background: var(--surface-2); border: 1.5px solid transparent; border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
   .kpi > .hint:first-child { font-weight: 600; }
   .kpi-v { line-height: 1.15; margin: 2px 0; }
-  .dash .fold > .card { background: var(--surface-2); border-radius: 16px; }
+  .dash .fold > .card, #devStrip > .card { background: var(--surface-2); border-radius: 16px; }
   .fold { margin-top: 18px; }
   .fold > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 6px 2px; user-select: none; }
   .fold > summary::-webkit-details-marker { display: none; }
@@ -303,7 +303,7 @@
   #attnExtra:empty { display: none; }
   #attnExtra { margin-top: 10px; display: grid; gap: 10px; }
   .dash-side .row { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(127,127,127,.2); }
-  @media (min-width: 900px) { .dash { grid-template-columns: minmax(0, 1fr) 260px; align-items: start; } .dash-side { position: sticky; top: 12px; } }
+  @media (min-width: 720px) { #devStrip .card { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); column-gap: 28px; } #devStrip .card > .spark-wrap, #devStrip .card > .dev-foot { grid-column: 1 / -1; } .spark-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); column-gap: 28px; } }
   /* account rows: the action buttons wrap below the name instead of covering it */
   #accList .set-row { flex-wrap: wrap; row-gap: 8px; }
   #accList .set-row .txt { flex: 1 1 160px; min-width: 0; }
@@ -973,8 +973,8 @@
     const sparks = [spark(sp.tempC, 'טמפרטורה', '°', SC.warn), spark(sp.cpuPct, 'מעבד', '%', SC.ok), spark(sp.memUsedPct, 'זיכרון', '%', SC.ok), spark(sp.wifi, 'Wi-Fi', ' dBm', SC.ok)].join('');
     $('#devAside').hidden = false;
     $('#devStrip').innerHTML = `<div class="card" style="padding:12px">${items.join('')}${wa}
-      ${sparks ? `<div class="hint" style="margin-top:10px">24 השעות האחרונות</div>${sparks}` : ''}
-      <div class="hint" style="margin-top:8px">ב-24 השעות האחרונות: ניתוקי Wi-Fi ${cnt('wifi_down')} · ניתוקי וואטסאפ ${cnt('wa_down')}</div></div>`;
+      ${sparks ? `<div class="spark-wrap"><div class="hint" style="margin-top:10px">24 השעות האחרונות</div><div class="spark-grid">${sparks}</div></div>` : ''}
+      <div class="hint dev-foot" style="margin-top:8px">ב-24 השעות האחרונות: ניתוקי Wi-Fi ${cnt('wifi_down')} · ניתוקי וואטסאפ ${cnt('wa_down')}</div></div>`;
   }
   setInterval(() => { if (view === 'home' && !document.hidden) loadDashboard().catch(() => {}); }, 10000);
 

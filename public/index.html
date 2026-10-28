@@ -744,10 +744,10 @@
       const ls = last ? stateLine(last.status) : null;
       return `<div class="chat ${c.enabled === false ? 'off' : ''}" style="${c.enabled === false ? 'opacity:.55' : ''}">${avatar(c.name)}
         <button class="grow g-main" data-act="editCol" data-id="${esc(c.id)}" aria-label="עריכת ${esc(c.name)}"><div class="t1"><span class="nm1">${esc(c.name)}</span><span class="tm g">${c.time ? num(c.time) : 'ידני'}</span></div>
-          <div class="pv">${esc(countLabel(names.length, isP))}${prev ? ' · ' + prev : ''}</div>
+          <div class="pv">${names.length ? esc(countLabel(names.length, isP)) + (prev ? ' · ' + prev : '') : `ריק. לחצו כדי להוסיף ${isP ? 'אנשי קשר' : 'קבוצות'}`}</div>
           ${ls ? `<div class="pv ${ls.cls}">${ls.pre}<span>${esc(ls.txt)} · ${esc(whenLabel(last.ts))}</span></div>` : ''}</button>
         <button class="sw-hit" data-act="tgCol" data-id="${esc(c.id)}" aria-label="הפעלה או השהיה של ${esc(c.name)}"><span class="sw" role="switch" aria-checked="${c.enabled !== false}"></span></button></div>
-        <div class="chat-sub"><button class="link" data-act="runCol" data-id="${esc(c.id)}">סיכום עכשיו</button></div>`;
+        ${names.length ? `<div class="chat-sub"><button class="link" data-act="runCol" data-id="${esc(c.id)}">סיכום עכשיו</button></div>` : ''}`;
     }).join('') : '<div class="empty">עדיין לא נוצרו אוספים. אוסף מאפשר לקבל סיכום נפרד לפי נושא, למשל "צוות הנהלה", "מחנכים" או "קבוצות הורים".</div>';
 
   }
@@ -1154,7 +1154,6 @@
   async function savePeople() {
     const name = $('#ppName').value.trim();
     if (!name) return toast('נא להזין שם לאוסף');
-    if (!ppSel.size) return toast('יש לבחור לפחות איש קשר אחד');
     const has = $('#ppHas').getAttribute('aria-checked') === 'true';
     const time = has ? $('#ppTime').value : null;
     if (has && !time) return toast('יש לבחור שעה');

@@ -1832,7 +1832,6 @@ app.post('/api/accounts/:id/collections', (req, res) => {
   if (existing && req.body.kind && req.body.kind !== kind) return res.status(400).json({ error: 'אי אפשר להחליף סוג של אוסף קיים' });
   if (kind === 'people') {
     const list = [...new Set((Array.isArray(jids) ? jids : []).map(String).filter(j => /^\d{9,15}@s\.whatsapp\.net$/.test(j)))];
-    if (!list.length) return res.status(400).json({ error: 'יש לבחור לפחות איש קשר אחד' });
     if (list.length > MAX_PEOPLE) return res.status(400).json({ error: `אפשר לבחור עד ${MAX_PEOPLE} אנשי קשר באוסף` });
     acc.collections = acc.collections || {};
     const pid = existing ? existing.id : 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);

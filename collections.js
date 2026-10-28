@@ -5,6 +5,8 @@
 // Pure functions only (no I/O), so they can be tested without WhatsApp.
 
 export const GENERAL_ID = 'general';
+export const PEOPLE_ID = 'people';
+export const PEOPLE_NAME = 'אנשי קשר';
 export const GENERAL_NAME = 'כללי';
 export const MAX_PEOPLE = 10;
 
@@ -41,6 +43,15 @@ export function ensureGeneral(acc) {
     acc.collections[GENERAL_ID].jids.push(jid);
     seen.add(jid);
     changed = true;
+  }
+  // An account starts with an empty people collection next to "General", so contacts can be added right away.
+  // Seeded once: a collection the user deletes later does not come back.
+  if (!acc.defaultsSeeded) {
+    acc.defaultsSeeded = true;
+    changed = true;
+    if (!Object.values(acc.collections).some(c => kindOf(c) === 'people')) {
+      acc.collections[PEOPLE_ID] = { id: PEOPLE_ID, kind: 'people', name: PEOPLE_NAME, time: null, jids: [], names: {}, enabled: true, prompt: '' };
+    }
   }
   return changed;
 }

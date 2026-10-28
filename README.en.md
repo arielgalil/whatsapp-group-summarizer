@@ -186,6 +186,8 @@ Stop / start: `nssm stop WhatsAppSummarizer`, `nssm start WhatsAppSummarizer`. T
 3. **Link WhatsApp:** on the home screen press "Show QR code", then on the phone WhatsApp, Linked devices, Link a device. The code is valid for about a minute and refreshes itself.
 4. **Create a group collection:** "Collections" tab, green "+" button, "Group collection": name, send time, and the groups (the list has a search box), plus an optional extra prompt. **Every group you pick is monitored, and a group in no collection is not read at all.**
 5. **People collection (optional):** the same "+" button, "People collection". See "People collections" below.
+
+> Every new account already has two empty collections, "General" (groups) and "Contacts" (people), so you can drop groups and contacts into them at once without creating anything first. You can rename them and set a time; the Contacts collection can be deleted (it does not come back), "General" cannot.
 6. **Test:** on home press the green floating button, choose a collection, "Summarize now" (last 24 hours).
 7. **The "General" collection** is the default. A group in it is summarised at its time (you can change it). Every group belongs to exactly one collection.
 

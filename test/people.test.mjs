@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ensureGeneral, collectionOf, deleteCollection, peopleCollectionFor, GENERAL_ID, MAX_PEOPLE } from '../collections.js';
+import { ensureGeneral, collectionOf, deleteCollection, peopleCollectionFor, dailyJobs as collectionJobs, GENERAL_ID, MAX_PEOPLE } from '../collections.js';
 
 const P = '972501234567@s.whatsapp.net';
 
@@ -75,4 +75,33 @@ test('a contact outside any people collection, or a message without text, is not
 test('a paused people collection does not store', () => {
   const paused = { collections: { p: { ...acc.collections.p, enabled: false } } };
   assert.equal(directMessageRecord({ acc: paused, msg: msg(), extractText: text }), null);
+});
+
+import { PEOPLE_ID } from '../collections.js';
+
+test('a fresh account gets General and an empty people collection', () => {
+  const acc = { summaryTime: '20:00', monitoredGroups: {} };
+  assert.equal(ensureGeneral(acc), true);
+  assert.deepEqual(acc.collections[GENERAL_ID].jids, []);
+  assert.deepEqual(acc.collections[PEOPLE_ID], { id: PEOPLE_ID, kind: 'people', name: 'אנשי קשר', time: null, jids: [], names: {}, enabled: true, prompt: '' });
+});
+
+test('the default people collection is seeded once: deleting it keeps it deleted', () => {
+  const acc = { monitoredGroups: {} };
+  ensureGeneral(acc);
+  assert.equal(deleteCollection(acc, PEOPLE_ID), true);
+  ensureGeneral(acc);
+  assert.equal(acc.collections[PEOPLE_ID], undefined);
+});
+
+test('an account that already has a people collection does not get a second one', () => {
+  const acc = { monitoredGroups: {}, collections: { p: { id: 'p', kind: 'people', name: 'צוות', jids: [P] } } };
+  ensureGeneral(acc);
+  assert.deepEqual(Object.keys(acc.collections).sort(), ['general', 'p']);
+});
+
+test('empty collections are never scheduled', () => {
+  const acc = { summaryTime: '20:00', monitoredGroups: {} };
+  ensureGeneral(acc);
+  assert.deepEqual(collectionJobs({ x: acc }), []);
 });

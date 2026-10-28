@@ -282,7 +282,10 @@
   .kpi-v { font-size: 1.6rem; font-weight: 700; }
   .dash { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .dash > * { min-width: 0; }
-  .kpi { min-width: 0; overflow-wrap: anywhere; }
+  .kpi { min-width: 0; overflow-wrap: anywhere; background: var(--surface-2); border: 1.5px solid transparent; border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .kpi > .hint:first-child { font-weight: 600; }
+  .kpi-v { line-height: 1.15; margin: 2px 0; }
+  .dash .fold > .card { background: var(--surface-2); border-radius: 16px; }
   .fold { margin-top: 18px; }
   .fold > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 6px 2px; user-select: none; }
   .fold > summary::-webkit-details-marker { display: none; }
@@ -504,6 +507,8 @@
   /* ---------- helpers ---------- */
   const acc = () => state && state.accounts && state.accounts[cur];
   const num = s => `<span class="num">${esc(s)}</span>`;
+  // thousands separators for counts (1,234)
+  const thou = n => (typeof n === 'number' && isFinite(n) ? n.toLocaleString('en-US') : n);
   const phone = id => { const d = String(id || '').split(':')[0].split('@')[0]; return d.startsWith('972') ? '0' + d.slice(3).replace(/^(\d{2})(\d{7})$/, '$1-$2') : d; };
   const hhmm = ts => new Date(ts).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
   const dayStart = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -718,9 +723,9 @@
       const s = stateLine(h.status);
       const nm = h.label.replace(/^אוסף: /, '');
       const detail = h.status === 'sent' && h.text ? `<div class="sum-body">${fmt(h.text)}</div>`
-        : `<div class="sum-body muted">${h.status === 'failed' ? esc(h.error || '') : h.status === 'skipped' ? `נבדקו ${h.messages || 0} הודעות ב-${h.groups || 0} קבוצות ולא אותרו עדכונים מהותיים או דחופים.` : 'לא התקבלו הודעות חדשות בקבוצות אלו, ולכן לא הופק סיכום.'}</div>`;
+        : `<div class="sum-body muted">${h.status === 'failed' ? esc(h.error || '') : h.status === 'skipped' ? `נבדקו ${thou(h.messages || 0)} הודעות ב-${h.groups || 0} קבוצות ולא אותרו עדכונים מהותיים או דחופים.` : 'לא התקבלו הודעות חדשות בקבוצות אלו, ולכן לא הופק סיכום.'}</div>`;
       return `<details class="h"><summary class="chat">${avatar(nm)}<div class="grow"><div class="t1"><span class="nm1">${esc(nm)}</span><span class="tm">${esc(whenLabel(h.ts))}</span></div>
-        <div class="pv ${s.cls}">${s.pre}<span>${esc(s.txt)}${h.messages ? ` · ${h.messages} הודעות` : ''}</span></div></div></summary>${detail}</details>`;
+        <div class="pv ${s.cls}">${s.pre}<span>${esc(s.txt)}${h.messages ? ` · ${thou(h.messages)} הודעות` : ''}</span></div></div></summary>${detail}</details>`;
     }).join('') : '<div class="empty">עדיין אין היסטוריה</div>';
     $('#moreHistory').hidden = hist.length <= histLimit;
 
@@ -837,7 +842,7 @@
     return v >= bad ? 'bad' : v >= warn ? 'warn' : 'ok';
   }
   function kpi(label, value, sub) {
-    return `<div class="card kpi"><div class="hint">${esc(label)}</div><div class="kpi-v">${value}</div>${sub ? `<div class="hint">${sub}</div>` : ''}</div>`;
+    return `<div class="card kpi"><div class="hint">${esc(label)}</div><div class="kpi-v">${thou(value)}</div>${sub ? `<div class="hint">${sub}</div>` : ''}</div>`;
   }
   function bars(vals, days, color, label) {
     const max = Math.max(1, ...vals);
@@ -846,11 +851,11 @@
       const bh = Math.round(v / max * (h - 6));
       return `<rect x="${(i * bw + 2).toFixed(1)}" y="${h - bh}" width="${(bw - 4).toFixed(1)}" height="${bh}" rx="2" fill="${color}"><title>${esc(days[i])}: ${v}</title></rect>`;
     }).join('');
-    return `<div class="hint">${esc(label)} (מקסימום ${max})</div><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:80px" role="img" aria-label="${esc(label)}">${rects}</svg>`;
+    return `<div class="hint">${esc(label)} (מקסימום ${thou(max)})</div><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:80px" role="img" aria-label="${esc(label)}">${rects}</svg>`;
   }
   const STAT_TXT = { sent: 'נשלח', queued: 'ממתין לשליחה', failed: 'נכשל', empty: 'ללא הודעות חדשות', skipped: 'ללא עדכונים דחופים' };
   async function loadDashboard() {
-    const [d, dev] = await Promise.all([api('/api/dashboard'), api('/api/device')]);
+    const [d, dev] = await Promise.all([api(`/api/dashboard?account=${encodeURIComponent(cur || '')}`), api(`/api/device?account=${encodeURIComponent(cur || '')}`)]);
     if (d.error) { $('#dashKpi').innerHTML = `<div class="empty">${esc(d.error)}</div>`; return; }
     renderDashboard(d);
     if (!dev.error) renderDeviceStrip({ ...dev.now, events: dev.events, spark: dev.spark });
@@ -889,10 +894,10 @@
     const warn = c => ` style="border-color:var(--${c}, ${c === 'bad' ? '#c62828' : '#b26a00'})"`;
     const kp = (extra, html) => html.replace('class="card kpi"', 'class="card kpi"' + extra);
     $('#dashKpi').innerHTML = [
-      kpi('סיכומים שנשלחו היום', t.sent.today, `מתוך ${sched} מתוזמנים · השבוע ${t.sent.week}`),
-      kpi('הודעות שנקלטו היום', t.collected.today, `ממוצע יומי (7 ימים): ${avg7}`),
-      kp(t.failed.today > 0 ? warn('bad') : '', kpi('סיכומים שנכשלו היום', t.failed.today, `השבוע: ${t.failed.week}`)),
-      kp(upAvg != null && upAvg < 95 ? warn('warn') : '', kpi('זמינות ב-7 ימים', upAvg == null ? '—' : `${upAvg}%`, upAvg == null ? 'מתחילה להימדד' : `${drops7} ניתוקים השבוע`)),
+      kpi('סיכומים שנשלחו היום', t.sent.today, `מתוך ${sched} מתוזמנים<br>השבוע: ${thou(t.sent.week)}`),
+      kpi('הודעות שנקלטו היום', t.collected.today, `ממוצע יומי (7 ימים): ${thou(avg7)}`),
+      kp(t.failed.today > 0 ? warn('bad') : '', kpi('סיכומים שנכשלו היום', t.failed.today, `השבוע: ${thou(t.failed.week)}`)),
+      kp(upAvg != null && upAvg < 95 ? warn('warn') : '', kpi('זמינות ב-7 ימים', upAvg == null ? '—' : `${upAvg}%`, upAvg == null ? 'מתחילה להימדד' : `${thou(drops7)} ניתוקים השבוע`)),
       hasPeople ? kpi('הודעות פרטיות היום', dm, 'נכנסות ויוצאות') : '',
     ].join('');
 
@@ -908,7 +913,7 @@
     const total = hours.reduce((a, b) => a + b, 0);
     if (total) {
       const peak = hours.indexOf(Math.max(...hours));
-      $('#dashHours').innerHTML = hoursChart(hours) + `<div class="hint" style="margin-top:6px">השעה העמוסה ביותר: <b>${HR(peak)}</b> · ${total} הודעות ב-7 הימים האחרונים.</div>`;
+      $('#dashHours').innerHTML = hoursChart(hours) + `<div class="hint" style="margin-top:6px">השעה העמוסה ביותר: <b>${HR(peak)}</b> · ${thou(total)} הודעות ב-7 הימים האחרונים.</div>`;
     } else $('#dashHours').innerHTML = '<div class="empty">עוד אין מספיק הודעות</div>';
 
     // result per collection
@@ -916,15 +921,15 @@
     const colRows = accs.flatMap(x => x.collections.map(c => {
       const s = x.colStats[c.id] || { runs: 0 };
       const line = s.runs
-        ? `${s.runs} ריצות · ${s.sent} נשלחו${s.quietPct ? ` · ${s.quietPct}% ללא עדכון חשוב` : ''}${s.failed ? ` · ${s.failed} נכשלו` : ''}`
+        ? `${thou(s.runs)} ריצות · ${thou(s.sent)} נשלחו${s.quietPct ? ` · ${s.quietPct}% ללא עדכון חשוב` : ''}${s.failed ? ` · ${s.failed} נכשלו` : ''}`
         : 'עוד לא רץ';
-      const last = s.runs ? `הריצה האחרונה: ${esc(stTxt[s.lastStatus] || s.lastStatus)}${s.lastMessages ? ` · ${s.lastMessages} הודעות` : ''}${s.lastBullets ? ` ← ${s.lastBullets} נקודות` : ''}` : '';
+      const last = s.runs ? `הריצה האחרונה: ${esc(stTxt[s.lastStatus] || s.lastStatus)}${s.lastMessages ? ` · ${thou(s.lastMessages)} הודעות` : ''}${s.lastBullets ? ` ← ${s.lastBullets} נקודות` : ''}` : '';
       return `<div class="dline"><b>${esc(c.name)}</b>${many ? ` <span class="hint">· ${esc(x.name)}</span>` : ''}${c.enabled ? '' : ' <span class="hint">(מושהה)</span>'}<div class="hint">${esc(line)}</div>${last ? `<div class="hint">${last}</div>` : ''}</div>`;
     }));
     $('#dashCols').innerHTML = colRows.length ? colRows.join('') : '<div class="empty">עדיין אין אוספים</div>';
 
     // private chats of people collections
-    const peopleRows = accs.flatMap(x => x.people.map(p => `<div class="dline"><b>${esc(p.name)}</b>${many ? ` <span class="hint">· ${esc(x.name)}</span>` : ''}${p.contacts.map(c => `<div class="hint">${esc(c.name)}: ${c.in} נכנסות · ${c.out} יוצאות</div>`).join('')}</div>`));
+    const peopleRows = accs.flatMap(x => x.people.map(p => `<div class="dline"><b>${esc(p.name)}</b>${many ? ` <span class="hint">· ${esc(x.name)}</span>` : ''}${p.contacts.map(c => `<div class="hint">${esc(c.name)}: ${thou(c.in)} נכנסות · ${thou(c.out)} יוצאות</div>`).join('')}</div>`));
     $('#foldPeople').hidden = !peopleRows.length;
     $('#dashPeople').innerHTML = peopleRows.join('');
 
@@ -942,7 +947,7 @@
 
     $('#dashChart').innerHTML = bars(d.series.sent, d.days, 'var(--accent, #2e7d32)', 'סיכומים שנשלחו ליום')
       + '<div style="height:12px"></div>' + bars(d.series.collected, d.days, 'var(--muted, #888)', 'הודעות שנקלטו ליום');
-    const tops = accs.flatMap(x => x.top.map(g => `<div class="pv">${many ? esc(x.name) + ' · ' : ''}${esc(g.name)} · ${g.n} הודעות</div>`));
+    const tops = accs.flatMap(x => x.top.map(g => `<div class="pv">${many ? esc(x.name) + ' · ' : ''}${esc(g.name)} · ${thou(g.n)} הודעות</div>`));
     $('#dashTop').innerHTML = tops.length ? tops.join('') : '<div class="empty">אין הודעות ב-24 השעות האחרונות</div>';
   }
   function renderDeviceStrip(n) {
@@ -1514,7 +1519,7 @@
     const t = e.target;
     if (t.matches('#ePick input')) { t.checked ? editor.selected.add(t.dataset.jid) : editor.selected.delete(t.dataset.jid); $('#eCount').textContent = editor.selected.size; }
     else if (t.id === 'extraPhone') { await api(`/api/accounts/${cur}/delivery-settings`, 'POST', { customPhone: t.value }); toast('ההגדרה נשמרה בהצלחה'); load(true); }
-    else if (t.id === 'accSel') { cur = t.value; store('cur', cur); renderAll(); }
+    else if (t.id === 'accSel') { cur = t.value; store('cur', cur); renderAll(); if (view === 'home') loadDashboard().catch(() => {}); }
     else if (t.id === 'modelSel') {
       const d = await api('/api/gemini/model', 'POST', { model: t.value });
       $('#modelRes').textContent = '';

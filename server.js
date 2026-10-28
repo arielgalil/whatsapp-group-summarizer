@@ -1435,13 +1435,21 @@ app.get('/api/auth/me', (req, res) => {
 // API: Device health (manager only): a fresh reading, plus the last 24 hours of samples and events.
 app.get('/api/device', async (req, res) => {
   if (!req.me.manager) return res.status(403).json({ error: 'רק למנהל' });
-  const now = { ...(await readDevice()), wa: waStatuses() };
+  const accId = dashAccountId(req);
+  const now = { ...(await readDevice()), wa: Object.fromEntries(Object.entries(waStatuses()).filter(([id]) => id === accId)) };
   const dayAgo = Date.now() - 24 * 3600 * 1000;
   const recent = deviceHistory.samples.filter(x => x.t >= dayAgo);
-  res.json({ now, spark: { tempC: downsample(recent, 'tempC'), cpuPct: downsample(recent, 'cpuPct'), memUsedPct: downsample(recent, 'memUsedPct'), wifi: downsample(recent, 'wifi') }, events: deviceHistory.events.filter(e => e.t >= dayAgo) });
+  res.json({ now, spark: { tempC: downsample(recent, 'tempC'), cpuPct: downsample(recent, 'cpuPct'), memUsedPct: downsample(recent, 'memUsedPct'), wifi: downsample(recent, 'wifi') }, events: deviceHistory.events.filter(e => e.t >= dayAgo && (!e.account || e.account === accId)) });
 });
 
-// API: Dashboard. Whole system for a manager; a plain account sees only itself.
+// API: Dashboard. Every user sees only their own account. A manager can look at another account only by choosing it
+// explicitly (?account=); the default is the account they signed in with.
+function dashAccountId(req) {
+  const want = String(req.query.account || '');
+  if (want && config.accounts[want] && (req.me.manager || want === req.me.accountId)) return want;
+  if (req.me.accountId && config.accounts[req.me.accountId]) return req.me.accountId;
+  return Object.keys(config.accounts)[0] || null;
+}
 function topGroups(accountId, since) {
   const counts = {};
   try {
@@ -1468,7 +1476,7 @@ function parsedMessages(accountId) {
   return list;
 }
 app.get('/api/dashboard', (req, res) => {
-  const ids = Object.keys(config.accounts).filter(id => req.me.manager || id === req.me.accountId);
+  const ids = [dashAccountId(req)].filter(Boolean);
   const days = lastDays(14);
   const today = dayKey();
   const dayAgo = Date.now() - 24 * 3600 * 1000;

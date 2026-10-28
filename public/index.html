@@ -819,7 +819,6 @@
   function renderDashboard(d) {
     const t = d.totals; const accs = Object.values(d.accounts);
     const monitored = accs.reduce((a, x) => a + x.groupsMonitored, 0);
-    const inCols = accs.reduce((a, x) => a + x.groupsCollected, 0);
     const colCount = accs.reduce((a, x) => a + x.collections.length, 0);
     const dm = accs.reduce((a, x) => a + x.dm.in + x.dm.out, 0);
     $('#dashHint').textContent = `${monitored} קבוצות במעקב · ${colCount} אוספים · ${accs.length} חשבונות`;
@@ -828,7 +827,7 @@
       kpi('סיכומים שנשלחו היום', t.sent.today, `השבוע: ${t.sent.week}`),
       kpi('סיכומים שנכשלו היום', t.failed.today, `השבוע: ${t.failed.week}`),
       kpi('הודעות שנאספו היום', t.collected.today, `השבוע: ${t.collected.week}`),
-      kpi('קבוצות במעקב', monitored, `${inCols} מהן באוספים`),
+      kpi('קבוצות במעקב', monitored, `ב-${colCount} אוספים`),
       kpi('הודעות פרטיות היום', dm, 'נכנסות ויוצאות'),
     ].join('');
     $('#dashChart').innerHTML = bars(d.series.sent, d.days, 'var(--accent, #2e7d32)', 'סיכומים שנשלחו ליום')

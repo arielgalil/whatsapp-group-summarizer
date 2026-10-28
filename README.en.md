@@ -18,7 +18,7 @@ A small self-hosted server that listens to your WhatsApp groups, asks Google Gem
 - **Several accounts:** link more than one WhatsApp number (e.g. a couple). Each account has its own password and sees only itself; the first one with a password is the manager.
 - **Auto-reply:** a fixed message to chosen people during chosen hours, optionally lightly personalised by AI.
 - **People collections:** a summary of your private chats with up to 10 important people, both what they wrote and what you wrote.
-- **Live home screen:** summaries sent, messages captured, the busiest groups, and the health of the device (temperature, memory, Wi-Fi, power). Tested on Raspberry Pi and Windows; designed for Linux and macOS too.
+- **Live dashboard on the home screen:** today's counters, when the groups are active, results per collection, groups worth a look, connection reliability and the health of the device (temperature, memory, Wi-Fi, power). Tested on Raspberry Pi and Windows; designed for Linux and macOS too.
 - **Phone alerts** (ntfy) when an account stays disconnected for 5 minutes or more, or a summary fails. Short drops that reconnect by themselves do not alert.
 - History import, daily backups, 7-day message retention.
 
@@ -26,7 +26,11 @@ A small self-hosted server that listens to your WhatsApp groups, asks Google Gem
 
 <table><tr>
 <td align="center"><img src="docs/screenshots/home.png" width="240"><br><sub>Home: status, today's counters and scheduled summaries</sub></td>
-<td align="center"><img src="docs/screenshots/home-dashboard.png" width="240"><br><sub>Home: the last summary and charts (sections fold and unfold)</sub></td>
+<td align="center"><img src="docs/screenshots/home-hours.png" width="240"><br><sub>Home: when the groups are active, and the busiest groups</sub></td>
+<td align="center"><img src="docs/screenshots/home-collections.png" width="240"><br><sub>Home: results per collection and private chats</sub></td>
+</tr><tr>
+<td align="center"><img src="docs/screenshots/home-review.png" width="240"><br><sub>Home: groups worth a look, and trends</sub></td>
+<td align="center"><img src="docs/screenshots/home-reliability.png" width="240"><br><sub>Home: connection reliability</sub></td>
 <td align="center"><img src="docs/screenshots/collections.png" width="240"><br><sub>Collections: time and prompt per collection, with the default "General"</sub></td>
 </tr></table>
 
@@ -110,7 +114,7 @@ journalctl -u whatsapp-summarizer -f         # logs
 </tr><tr>
 <td align="center"><img src="docs/screenshots/auto-reply.png" width="240"><br><sub>An auto-reply rule</sub></td>
 <td align="center"><img src="docs/screenshots/settings.png" width="240"><br><sub>Settings</sub></td>
-<td align="center"><img src="docs/screenshots/home-device.png" width="240"><br><sub>Device health on the home screen</sub></td>
+<td align="center"><img src="docs/screenshots/home-device.png" width="240"><br><sub>Device health: values and 24-hour charts</sub></td>
 </tr><tr>
 <td align="center"><img src="docs/screenshots/login.png" width="240"><br><sub>Password sign-in</sub></td>
 <td align="center"><img src="docs/screenshots/home-dark.png" width="240"><br><sub>Dark mode: home</sub></td>
@@ -192,7 +196,7 @@ Capture starts only when the link is up and the group is monitored. Earlier mess
 - Scheduled summaries cover the **previous calendar day**; "Summarize now" covers the last 24 hours.
 - "Nothing important/urgent" is recorded in the history and nothing is sent.
 - **People collections:** "Collections", "+", "People collection": a name, an optional time, up to 10 contacts (search by name or type a number) and an optional prompt. The summary covers your **private chats** with them in the last 24 hours, in both directions, one section per person. Only chats with the people you picked are stored, and only from the moment you add them; they are kept for 2 days (group messages: 7 days), so the first summary only contains messages since then. The chat text is **sent to Gemini**, like group text. Contacts that WhatsApp identifies by an internal id (`@lid`) are stored only if WhatsApp also provides their phone number.
-- **Home screen and device health:** today's counters (summaries sent and failed, messages captured), monitored groups, the busiest groups and 14-day charts. Sections fold and unfold and the state is remembered on the device. At the bottom, a device card: temperature, CPU, memory, Wi-Fi, free space, on a Raspberry Pi also power, and the Wi-Fi and WhatsApp drops of the last 24 hours. Readings are read-only and were tested on Raspberry Pi and Windows (Linux and macOS are designed but untested); a value the system cannot provide is simply not shown. Only the manager sees the device card.
+- **The home dashboard**, most important first; every section folds and unfolds and the state is remembered on the device. It is built for phones. It shows the status and anything that needs attention (a disconnected account, a failed summary, queued messages, Gemini not answering); today's numbers (summaries sent out of those scheduled, messages captured against the 7-day average, failures, 7-day availability); when the groups are active (24-hour chart over the last 7 days) and the busiest groups; results per collection (runs, how often nothing important came up, messages in and bullets out for the last run); the private chats of people collections; groups worth a look (monitored groups silent for 7+ days, and unmonitored groups that wrote in the last 48 hours); 14-day trends and connection reliability (availability is counted from the minutes the account was connected, and starts accumulating when this version is installed); and, for the manager only, the device: temperature, CPU, memory, Wi-Fi, free space, on a Raspberry Pi also power, each with a 24-hour chart. Readings are read-only; a value the system cannot provide is not shown.
 - **Auto-reply:** Settings, "Auto-reply". Private chats only, new messages only, at most 20 replies per hour, once per person per cool-down. AI personalisation is off by default; when on, the sender's first name and message are sent to Gemini and any failure falls back to your own text.
 - **Phone alerts:** install the free [ntfy](https://ntfy.sh) app, subscribe to **exactly** the topic name shown in Settings, press "Send test". An alert goes out when an account stays disconnected for 5 minutes or more, when capture stalls, when the server is overloaded and when a summary fails; short drops that reconnect by themselves are only logged.
 - **Remote access:** do not expose the dashboard to the internet. Use Tailscale on the server and your phone.

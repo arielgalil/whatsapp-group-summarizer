@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 import { ensureGeneral, collectionOf, setMembership, deleteCollection, dailyJobs as collectionJobs, GENERAL_ID, kindOf, MAX_PEOPLE, directMessageRecord } from './collections.js';
 import { readDevice, detectEvents } from './device.js';
 import { dayKey, lastDays, bumpDaily, pruneDaily, seriesOf, totalOf } from './dashboard.js';
+import { downsample, hourlyCounts, quietGroups, activeUnmonitored, collectionStats, peopleStats, uptimePct } from './insights.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -423,6 +424,7 @@ async function initAccountSession(accountId, manual = false) {
         // every single reconnect succeeds, and repeated drops back off instead of hammering WhatsApp.
         s.drops = (s.drops || []).filter(t => Date.now() - t < 30 * 60 * 1000).concat(Date.now());
         s.downSince = s.downSince || Date.now();
+        bumpDaily(dailyStats, dayKey(), accountId, 'drops');
         const delay = statusCode === DisconnectReason.connectionReplaced
           ? 5 * 60 * 1000 // 440: another instance uses these credentials; never fight it every 5 seconds
           : Math.min(5000 * 2 ** Math.max(0, s.drops.length - 3), 2 * 60 * 1000);
@@ -1091,6 +1093,7 @@ async function summarizeAccount(accountId, targetJids = null, scheduleLabel = ''
       }
       if (response.ok) { usedModel = model; console.log(`[summary] model ${model} OK`); break; }
       lastErr = `${model} (${response.status}): ${(await response.text()).slice(0, 300)}`;
+      bumpDaily(dailyStats, dayKey(), accountId, 'modelFail');
       console.error(`[summary] ${lastErr}`);
       const retryable = [429, 500, 503].includes(response.status);
       response = null;
@@ -1434,7 +1437,8 @@ app.get('/api/device', async (req, res) => {
   if (!req.me.manager) return res.status(403).json({ error: 'רק למנהל' });
   const now = { ...(await readDevice()), wa: waStatuses() };
   const dayAgo = Date.now() - 24 * 3600 * 1000;
-  res.json({ now, samples: deviceHistory.samples.filter(x => x.t >= dayAgo), events: deviceHistory.events.filter(e => e.t >= dayAgo) });
+  const recent = deviceHistory.samples.filter(x => x.t >= dayAgo);
+  res.json({ now, spark: { tempC: downsample(recent, 'tempC'), cpuPct: downsample(recent, 'cpuPct'), memUsedPct: downsample(recent, 'memUsedPct'), wifi: downsample(recent, 'wifi') }, events: deviceHistory.events.filter(e => e.t >= dayAgo) });
 });
 
 // API: Dashboard. Whole system for a manager; a plain account sees only itself.
@@ -1449,6 +1453,20 @@ function topGroups(accountId, since) {
   } catch (e) {}
   return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, n]) => ({ name, n }));
 }
+const msgCache = {};
+function parsedMessages(accountId) {
+  const c = msgCache[accountId];
+  if (c && Date.now() - c.at < 30000) return c.list;
+  const list = [];
+  try {
+    for (const line of fs.readFileSync(path.join(DATA_DIR, `${accountId}_messages.jsonl`), 'utf8').split('\n')) {
+      if (!line) continue;
+      try { const m = JSON.parse(line); list.push({ jid: m.jid, groupName: m.groupName, sender: m.sender, timestamp: m.timestamp, kind: m.kind }); } catch (e) {}
+    }
+  } catch (e) {}
+  msgCache[accountId] = { at: Date.now(), list };
+  return list;
+}
 app.get('/api/dashboard', (req, res) => {
   const ids = Object.keys(config.accounts).filter(id => req.me.manager || id === req.me.accountId);
   const days = lastDays(14);
@@ -1458,6 +1476,8 @@ app.get('/api/dashboard', (req, res) => {
   for (const id of ids) {
     const acc = config.accounts[id];
     const cols = Object.values(acc.collections || {});
+    const msgs = parsedMessages(id);
+    const quietAll = quietGroups(acc.monitoredGroups);
     accounts[id] = {
       name: acc.name || id,
       connected: sessions[id]?.status === 'connected',
@@ -1469,6 +1489,19 @@ app.get('/api/dashboard', (req, res) => {
       }),
       dm: (dmStats[today] || {})[id] || { in: 0, out: 0 },
       top: topGroups(id, dayAgo),
+      hours: hourlyCounts(msgs.filter(m => m.kind !== 'dm'), Date.now() - 7 * 24 * 3600 * 1000),
+      quiet: quietAll.slice(0, 8),
+      quietTotal: quietAll.length,
+      offActive: activeUnmonitored(acc.monitoredGroups),
+      colStats: Object.fromEntries(cols.map(c => [c.id, collectionStats(sendHistory.filter(h => h.accountId === id), c.id)])),
+      people: cols.filter(c => kindOf(c) === 'people').map(c => ({
+        id: c.id, name: c.name,
+        contacts: peopleStats(msgs, c.jids || [], dayAgo).map(p => ({ ...p, name: p.name || (c.names || {})[p.jid] || ('+' + p.jid.split('@')[0]) })),
+      })),
+      uptime7: uptimePct(dailyStats, days.slice(-7), id),
+      drops7: totalOf(dailyStats, days.slice(-7), 'drops', [id]),
+      dropsSeries: seriesOf(dailyStats, days, 'drops', [id]),
+      modelFail7: totalOf(dailyStats, days.slice(-7), 'modelFail', [id]),
     };
   }
   const sums = key => ({ today: totalOf(dailyStats, [today], key, ids), week: totalOf(dailyStats, days.slice(-7), key, ids) });
@@ -1477,6 +1510,7 @@ app.get('/api/dashboard', (req, res) => {
     series: { sent: seriesOf(dailyStats, days, 'sent', ids), failed: seriesOf(dailyStats, days, 'failed', ids), collected: seriesOf(dailyStats, days, 'collected', ids) },
     totals: { sent: sums('sent'), failed: sums('failed'), collected: sums('collected') },
     accounts,
+    queued: outbox.filter(j => (j.status === 'pending' || j.status === 'sending') && ids.includes(j.accountId)).length,
     serverTime: new Date().toISOString(),
   });
 });
@@ -2020,6 +2054,10 @@ async function deviceTick() {
   deviceLast = cur;
   deviceHistory.samples.push(cur);
   countCollected();
+  for (const id of Object.keys(config.accounts)) {
+    bumpDaily(dailyStats, dayKey(), id, 'ticks');
+    if (cur.wa[id]) bumpDaily(dailyStats, dayKey(), id, 'up');
+  }
   const dayAgo = Date.now() - 24 * 3600 * 1000;
   const twoWeeksAgo = Date.now() - 14 * 24 * 3600 * 1000;
   deviceHistory.samples = deviceHistory.samples.filter(x => x.t >= dayAgo);

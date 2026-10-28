@@ -291,6 +291,14 @@
   .fold:not([open]) > summary::before { transform: rotate(-90deg); }
   .fold > summary:focus-visible { outline: 2px solid var(--accent, #2e7d32); border-radius: 6px; }
   .fold > summary .hint { order: 1; }
+  .fold[hidden] { display: none; }
+  .dline { padding: 10px 12px; border-bottom: 1px solid rgba(127,127,127,.2); }
+  .dline:last-child { border-bottom: 0; }
+  .dline .pv { margin-top: 2px; }
+  .spark { margin-top: 6px; }
+  #dashKpi { margin-top: 12px; }
+  #attnExtra:empty { display: none; }
+  #attnExtra { margin-top: 10px; display: grid; gap: 10px; }
   .dash-side .row { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(127,127,127,.2); }
   @media (min-width: 900px) { .dash { grid-template-columns: minmax(0, 1fr) 260px; align-items: start; } .dash-side { position: sticky; top: 12px; } }
   /* account rows: the action buttons wrap below the name instead of covering it */
@@ -318,6 +326,7 @@
       <!-- HOME -->
       <section class="view" id="view-home">
         <div id="statusArea"><div class="status"><div class="sub">טוען…</div></div></div>
+        <div id="attnExtra"></div>
         <div class="dash">
           <div class="dash-main">
             <div id="dashKpi" class="kpis"></div>
@@ -332,14 +341,39 @@
               <div class="card" id="lastSummary"></div>
             </details>
 
+            <details class="fold" data-key="hours" open>
+              <summary><h2>מתי הקבוצות פעילות</h2></summary>
+              <div class="card" style="padding:12px" id="dashHours"></div>
+            </details>
+
             <details class="fold" data-key="top" open>
               <summary><h2>הקבוצות הפעילות ביותר</h2></summary>
               <div class="card" style="padding:12px" id="dashTop"></div>
             </details>
 
+            <details class="fold" data-key="cols" open>
+              <summary><h2>תוצאות לפי אוסף</h2></summary>
+              <div class="card list" id="dashCols"></div>
+            </details>
+
+            <details class="fold" data-key="people" id="foldPeople" open hidden>
+              <summary><h2>שיחות פרטיות באוספי אנשי קשר</h2><span class="hint">24 שעות</span></summary>
+              <div class="card list" id="dashPeople"></div>
+            </details>
+
+            <details class="fold" data-key="review" id="foldReview" open hidden>
+              <summary><h2>קבוצות שכדאי לבדוק</h2></summary>
+              <div class="card list" id="dashReview"></div>
+            </details>
+
             <details class="fold" data-key="charts">
               <summary><h2>מגמות ב-14 הימים האחרונים</h2></summary>
               <div class="card" style="padding:12px" id="dashChart"></div>
+            </details>
+
+            <details class="fold" data-key="reliability">
+              <summary><h2>אמינות החיבור</h2></summary>
+              <div class="card list" id="dashRel"></div>
             </details>
 
             <details class="fold" data-key="history">
@@ -348,7 +382,12 @@
               <div style="text-align:center;margin-top:8px"><button class="link" id="moreHistory" data-act="moreHistory" hidden>הצגת סיכומים נוספים</button></div>
             </details>
           </div>
-          <aside class="dash-side" id="devStrip"></aside>
+          <aside class="dash-side" id="devAside" hidden>
+            <details class="fold" data-key="device" open>
+              <summary><h2>מצב המכשיר</h2><span class="hint" id="devHint"></span></summary>
+              <div id="devStrip"></div>
+            </details>
+          </aside>
         </div>
       </section>
 
@@ -814,25 +853,96 @@
     const [d, dev] = await Promise.all([api('/api/dashboard'), api('/api/device')]);
     if (d.error) { $('#dashKpi').innerHTML = `<div class="empty">${esc(d.error)}</div>`; return; }
     renderDashboard(d);
-    if (!dev.error) renderDeviceStrip({ ...dev.now, events: dev.events });
+    if (!dev.error) renderDeviceStrip({ ...dev.now, events: dev.events, spark: dev.spark });
+  }
+  const HR = h => String(h).padStart(2, '0') + ':00';
+  function hoursChart(vals) {
+    const max = Math.max(1, ...vals); const w = 288, h = 84, bw = w / 24;
+    const peak = vals.indexOf(Math.max(...vals));
+    const rects = vals.map((v, i) => {
+      const bh = v ? Math.max(2, Math.round(v / max * (h - 16))) : 0;
+      return `<rect x="${(i * bw + 1).toFixed(1)}" y="${h - 14 - bh}" width="${(bw - 2).toFixed(1)}" height="${bh}" rx="2" fill="${i === peak ? 'var(--accent, #2e7d32)' : 'var(--muted, #888)'}" opacity="${i === peak ? 1 : .55}"><title>${HR(i)}: ${v}</title></rect>`;
+    }).join('');
+    const labels = [0, 6, 12, 18].map(i => `<text x="${(i * bw + bw / 2).toFixed(1)}" y="${h - 2}" font-size="9" text-anchor="middle" fill="currentColor" opacity=".7">${i}</text>`).join('');
+    return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;direction:ltr" role="img" aria-label="הודעות לפי שעה ביום">${rects}${labels}</svg>`;
+  }
+  function spark(vals, label, unit, color) {
+    if (!vals || vals.length < 2) return '';
+    const min = Math.min(...vals), max = Math.max(...vals), span = Math.max(1, max - min);
+    const pts = vals.map((v, i) => `${(i / (vals.length - 1) * 100).toFixed(1)},${(26 - (v - min) / span * 22).toFixed(1)}`).join(' ');
+    return `<div class="spark"><div class="hint">${esc(label)} <span dir="ltr">${min} – ${max}${unit}</span></div><svg viewBox="0 0 100 28" preserveAspectRatio="none" style="width:100%;height:34px;direction:ltr" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg></div>`;
   }
   function renderDashboard(d) {
-    const t = d.totals; const accs = Object.values(d.accounts);
+    const t = d.totals; const accs = Object.values(d.accounts); const many = accs.length > 1;
     const monitored = accs.reduce((a, x) => a + x.groupsMonitored, 0);
     const colCount = accs.reduce((a, x) => a + x.collections.length, 0);
+    const sched = accs.reduce((a, x) => a + x.collections.filter(c => c.enabled && c.time).length, 0);
     const dm = accs.reduce((a, x) => a + x.dm.in + x.dm.out, 0);
-    $('#dashHint').textContent = `${monitored} קבוצות במעקב · ${colCount} אוספים · ${accs.length} חשבונות`;
-    const failedKpi = t.failed.today > 0 ? ' style="border-color:var(--bad, #c62828)"' : '';
+    const hasPeople = accs.some(x => x.people.length);
+    $('#dashHint').textContent = `${monitored} קבוצות במעקב · ${colCount} אוספים${many ? ` · ${accs.length} חשבונות` : ''}`;
+
+    // key numbers
+    const col7 = d.series.collected.slice(-7); const avg7 = Math.round(col7.reduce((a, b) => a + b, 0) / Math.max(1, col7.length));
+    const ups = accs.map(x => x.uptime7).filter(v => v != null);
+    const upAvg = ups.length ? Math.round(ups.reduce((a, b) => a + b, 0) / ups.length * 10) / 10 : null;
+    const drops7 = accs.reduce((a, x) => a + x.drops7, 0);
+    const warn = c => ` style="border-color:var(--${c}, ${c === 'bad' ? '#c62828' : '#b26a00'})"`;
+    const kp = (extra, html) => html.replace('class="card kpi"', 'class="card kpi"' + extra);
     $('#dashKpi').innerHTML = [
-      kpi('סיכומים שנשלחו היום', t.sent.today, `השבוע: ${t.sent.week}`),
-      kpi('סיכומים שנכשלו היום', t.failed.today, `השבוע: ${t.failed.week}`),
-      kpi('הודעות שנאספו היום', t.collected.today, `השבוע: ${t.collected.week}`),
-      kpi('קבוצות במעקב', monitored, `ב-${colCount} אוספים`),
-      kpi('הודעות פרטיות היום', dm, 'נכנסות ויוצאות'),
+      kpi('סיכומים שנשלחו היום', t.sent.today, `מתוך ${sched} מתוזמנים · השבוע ${t.sent.week}`),
+      kpi('הודעות שנקלטו היום', t.collected.today, `ממוצע יומי (7 ימים): ${avg7}`),
+      kp(t.failed.today > 0 ? warn('bad') : '', kpi('סיכומים שנכשלו היום', t.failed.today, `השבוע: ${t.failed.week}`)),
+      kp(upAvg != null && upAvg < 95 ? warn('warn') : '', kpi('זמינות ב-7 ימים', upAvg == null ? '—' : `${upAvg}%`, upAvg == null ? 'מתחילה להימדד' : `${drops7} ניתוקים השבוע`)),
+      hasPeople ? kpi('הודעות פרטיות היום', dm, 'נכנסות ויוצאות') : '',
     ].join('');
+
+    // things that need attention, under the status card
+    const extra = [];
+    if (d.queued) extra.push(`<div class="alert warn"><b>${ICON.alert} ${d.queued} הודעות ממתינות לשליחה</b><p>הן יישלחו כשהחיבור לוואטסאפ יחזור.</p></div>`);
+    const mf = accs.reduce((a, x) => a + x.modelFail7, 0);
+    if (mf >= 3) extra.push(`<div class="alert warn"><b>${ICON.alert} Gemini לא ענה ${mf} פעמים השבוע</b><p>המערכת עוברת למודל חלופי והסיכומים יוצאים. אם זה חוזר, כדאי לבדוק את מודל Gemini בהגדרות.</p></div>`);
+    $('#attnExtra').innerHTML = extra.join('');
+
+    // when the groups are active
+    const hours = Array.from({ length: 24 }, (_, i) => accs.reduce((a, x) => a + (x.hours[i] || 0), 0));
+    const total = hours.reduce((a, b) => a + b, 0);
+    if (total) {
+      const peak = hours.indexOf(Math.max(...hours));
+      $('#dashHours').innerHTML = hoursChart(hours) + `<div class="hint" style="margin-top:6px">השעה העמוסה ביותר: <b>${HR(peak)}</b> · ${total} הודעות ב-7 הימים האחרונים.</div>`;
+    } else $('#dashHours').innerHTML = '<div class="empty">עוד אין מספיק הודעות</div>';
+
+    // result per collection
+    const stTxt = { sent: 'נשלח', skipped: 'ללא עדכון חשוב', failed: 'נכשל', empty: 'ללא הודעות חדשות' };
+    const colRows = accs.flatMap(x => x.collections.map(c => {
+      const s = x.colStats[c.id] || { runs: 0 };
+      const line = s.runs
+        ? `${s.runs} ריצות · ${s.sent} נשלחו${s.quietPct ? ` · ${s.quietPct}% ללא עדכון חשוב` : ''}${s.failed ? ` · ${s.failed} נכשלו` : ''}`
+        : 'עוד לא רץ';
+      const last = s.runs ? `הריצה האחרונה: ${esc(stTxt[s.lastStatus] || s.lastStatus)}${s.lastMessages ? ` · ${s.lastMessages} הודעות` : ''}${s.lastBullets ? ` ← ${s.lastBullets} נקודות` : ''}` : '';
+      return `<div class="dline"><b>${esc(c.name)}</b>${many ? ` <span class="hint">· ${esc(x.name)}</span>` : ''}${c.enabled ? '' : ' <span class="hint">(מושהה)</span>'}<div class="hint">${esc(line)}</div>${last ? `<div class="hint">${last}</div>` : ''}</div>`;
+    }));
+    $('#dashCols').innerHTML = colRows.length ? colRows.join('') : '<div class="empty">עדיין אין אוספים</div>';
+
+    // private chats of people collections
+    const peopleRows = accs.flatMap(x => x.people.map(p => `<div class="dline"><b>${esc(p.name)}</b>${many ? ` <span class="hint">· ${esc(x.name)}</span>` : ''}${p.contacts.map(c => `<div class="hint">${esc(c.name)}: ${c.in} נכנסות · ${c.out} יוצאות</div>`).join('')}</div>`));
+    $('#foldPeople').hidden = !peopleRows.length;
+    $('#dashPeople').innerHTML = peopleRows.join('');
+
+    // groups worth a look
+    const rev = [];
+    accs.forEach(x => {
+      if (x.quiet.length) rev.push(`<div class="dline"><b>קבוצות שקטות</b>${many ? ` <span class="hint">· ${esc(x.name)}</span>` : ''}<div class="hint">במעקב, בלי הודעות 7 ימים ויותר (${x.quietTotal}). אולי אפשר להסיר.</div>${x.quiet.map(g => `<div class="pv">${esc(g.name)} · ${g.daysSince == null ? 'בלי פעילות' : g.daysSince + ' ימים'}</div>`).join('')}${x.quietTotal > x.quiet.length ? `<div class="hint">ועוד ${x.quietTotal - x.quiet.length}</div>` : ''}</div>`);
+      if (x.offActive.length) rev.push(`<div class="dline"><b>פעילות, ולא במעקב</b>${many ? ` <span class="hint">· ${esc(x.name)}</span>` : ''}<div class="hint">כתבו ב-48 השעות האחרונות. אפשר להוסיף אותן לאוסף.</div>${x.offActive.map(g => `<div class="pv">${esc(g.name)} · לפני ${g.hoursAgo} שעות</div>`).join('')}</div>`);
+    });
+    $('#foldReview').hidden = !rev.length;
+    $('#dashReview').innerHTML = rev.join('');
+
+    // reliability
+    $('#dashRel').innerHTML = accs.map(x => `<div class="dline"><b>${esc(x.name)}</b><div class="hint">זמינות ב-7 ימים: ${x.uptime7 == null ? 'עדיין נמדדת' : x.uptime7 + '%'} · ${x.drops7} ניתוקים · Gemini לא ענה ${x.modelFail7} פעמים</div>${bars(x.dropsSeries, d.days, 'var(--bad, #c62828)', 'ניתוקים ליום')}</div>`).join('');
+
     $('#dashChart').innerHTML = bars(d.series.sent, d.days, 'var(--accent, #2e7d32)', 'סיכומים שנשלחו ליום')
-      + '<div style="height:12px"></div>' + bars(d.series.collected, d.days, 'var(--muted, #888)', 'הודעות שנאספו ליום');
-    const tops = accs.flatMap(x => x.top.map(g => `<div class="pv">${esc(x.name)} · ${esc(g.name)} · ${g.n} הודעות</div>`));
+      + '<div style="height:12px"></div>' + bars(d.series.collected, d.days, 'var(--muted, #888)', 'הודעות שנקלטו ליום');
+    const tops = accs.flatMap(x => x.top.map(g => `<div class="pv">${many ? esc(x.name) + ' · ' : ''}${esc(g.name)} · ${g.n} הודעות</div>`));
     $('#dashTop').innerHTML = tops.length ? tops.join('') : '<div class="empty">אין הודעות ב-24 השעות האחרונות</div>';
   }
   function renderDeviceStrip(n) {
@@ -853,7 +963,12 @@
     const ev = n.events || [];
     const cnt = t => ev.filter(e => e.type === t).length;
     const title = [p.model, p.os].filter(Boolean).join(' · ') || 'המכשיר';
-    $('#devStrip').innerHTML = `<div class="card" style="padding:12px"><div class="hint">${esc(title)}</div>${items.join('')}${wa}
+    $('#devHint').textContent = title;
+    const sp = n.spark || {};
+    const sparks = [spark(sp.tempC, 'טמפרטורה', '°', SC.warn), spark(sp.cpuPct, 'מעבד', '%', SC.ok), spark(sp.memUsedPct, 'זיכרון', '%', SC.ok), spark(sp.wifi, 'Wi-Fi', ' dBm', SC.ok)].join('');
+    $('#devAside').hidden = false;
+    $('#devStrip').innerHTML = `<div class="card" style="padding:12px">${items.join('')}${wa}
+      ${sparks ? `<div class="hint" style="margin-top:10px">24 השעות האחרונות</div>${sparks}` : ''}
       <div class="hint" style="margin-top:8px">ב-24 השעות האחרונות: ניתוקי Wi-Fi ${cnt('wifi_down')} · ניתוקי וואטסאפ ${cnt('wa_down')}</div></div>`;
   }
   setInterval(() => { if (view === 'home' && !document.hidden) loadDashboard().catch(() => {}); }, 10000);
